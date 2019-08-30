@@ -1,30 +1,16 @@
 import React from 'react';
 import { fabric } from 'fabric';
-import { /* Upload,  */ Button, /* Icon, */ Radio, Input, message, Modal } from 'antd';
+import { Button, Radio, Input, message, Modal, Spin } from 'antd';
 import utils from '@/utils/utils.js';
 import SuperGif from 'libgif';
 //import axios from 'axios';
-import '../index.scss';
+import styles from '../index.scss';
 message.config({
   maxCount: 1,
 });
-function loadBuffer(file, onload, onerror, onprogress) {
-  var fr;
-  fr = new FileReader();
-  fr.onload = function() {
-    onload(this.result);
-  };
-  fr.onerror = function() {
-    if (onerror) {
-      onerror(this.error);
-    }
-  };
-  fr.readAsArrayBuffer(file);
-}
 class App extends React.Component {
   constructor(props) {
     super(props);
-    this.handlerInputChange = this.handlerInputChange.bind(this);
     this.addFrames = this.addFrames.bind(this);
     this.reduceFrames = this.reduceFrames.bind(this);
     this.onChange = this.onChange.bind(this);
@@ -33,8 +19,9 @@ class App extends React.Component {
       clipPartNum: 3, //gif分的段数 默认3段
       optionArr: [], //初始化数据,initData
       previewGifVisible: false,
+      spinVisible: false,
       timeinterval: 100,
-      gifUrl: 'http://127.0.0.1:5500/example_gifs/spin.gif',
+      gifUrl: 'http://img.mp.itc.cn/upload/20170721/04b9fde60b6d4951a666fda733811ff7.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
     };
     this.bgColorArr = [
       'rgba(0,0,0,0.3)',
@@ -54,7 +41,6 @@ class App extends React.Component {
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
     this.pre_load_gif(this.state.gifUrl);
-    //this.setState({ previewGifVisible: false });
     this.initData();
     let that = this;
     this.canvas_sprite.on('object:moving', function(e) {
@@ -119,6 +105,9 @@ class App extends React.Component {
       return;
     }
     try {
+      this.setState({
+        spinVisible: true,
+      });
       const gifImg = document.createElement('img');
       // gif库需要img标签配置下面两个属性
       gifImg.setAttribute('rel:animated_src', gif_source);
@@ -126,7 +115,6 @@ class App extends React.Component {
       const div = document.createElement('div');
       div.appendChild(gifImg); //防止报错
       // 新建gif实例
-
       var rub = new SuperGif({ gif: gifImg });
       rub.load(() => {
         var img_list = [];
@@ -146,6 +134,9 @@ class App extends React.Component {
       });
     } catch (error) {
       message.error(`出错了${error}`, 2);
+      this.setState({
+        spinVisible: false,
+      });
     }
   }
   convertCanvasToImage(canvas, filename) {
@@ -164,7 +155,6 @@ class App extends React.Component {
   }
   initData() {
     let { clipPartNum } = this.state;
-
     this.clearCanvas();
     this.rects = new Array(clipPartNum).fill('');
     this.texts = new Array(clipPartNum).fill('');
@@ -195,32 +185,7 @@ class App extends React.Component {
       },
     );
   }
-  componentWillUnmount() {}
-  handlerInputChange(file) {
-    let that = this;
-    if (/gif$/.test(file.type)) {
-      loadBuffer(
-        file,
-        function(buf) {
-          var gif;
-          gif = new window.Gif();
-          gif.onparse = function() {
-            setTimeout(function() {
-              that.buildView(gif, file.name, true);
-            }, 20);
-          };
-          gif.parse(buf);
-        },
-        function(e) {
-          alert(e);
-        },
-      );
-    } else {
-      alert('"' + file.name + '" not GIF');
-    }
-  }
   onChange = e => {
-    //console.log('radio checked', e.target.value);
     this.setState(
       {
         clipPartNum: e.target.value,
@@ -278,6 +243,9 @@ class App extends React.Component {
       },
       () => {
         this.renderFramesInit();
+        this.setState({
+          spinVisible: false,
+        });
       },
     ); //分配完帧数,渲染矩形分割区和文字
   }
@@ -316,7 +284,6 @@ class App extends React.Component {
   clearCanvas() {
     let canvas_sprite = this.canvas_sprite;
     this.rects.forEach(function(item, i) {
-      console.log('item', item);
       if (item) {
         canvas_sprite.remove(item);
       }
@@ -406,7 +373,6 @@ class App extends React.Component {
           return index + 1 <= item && index + 1 > frames[index2 - 1];
         }
       });
-      //console.log('this.imgs[index]', this.imgs[index]);
       let img = fabric.util.object.clone(this.imgs[index]);
       let text = fabric.util.object.clone(this.texts[textIndex]);
       await this.addGifFrame(canvas, img, text, textIndex);
@@ -422,40 +388,28 @@ class App extends React.Component {
     img.left = 0;
     img.top = 0;
     let optionArr = this.state.optionArr;
-
     text.left = optionArr[textIndex].left;
     text.top = optionArr[textIndex].top;
     clearTimeout(this.t);
     return new Promise(res => {
       this.t = setTimeout(() => {
         canvas.clear();
-        canvas.add(img /* this.imgs[0] */);
-        canvas.add(text /* this.texts[0] */);
+        canvas.add(img);
+        canvas.add(text);
         canvas.renderAll();
         res();
       }, this.state.timeinterval);
     });
   }
   render() {
-    /* let that = this;
-    const props = {
-      beforeUpload(file) {
-        that.handlerInputChange(file);
-      },
-    }; */
-    const { optionArr, previewGifVisible, timeinterval, gifUrl } = this.state;
+    const { optionArr, previewGifVisible, timeinterval, gifUrl, spinVisible } = this.state;
     return (
       <div id="main">
         <canvas id="merge" width="2000" height="300" />
         <div className="box">
-          <div>
-            {/* <Upload {...props}>
-              <Button>
-                <Icon type="upload" /> Click to Upload
-              </Button>
-            </Upload> */}
+          <div className={styles['url-input']}>
             <Input
-              addonBefore="添加gif图片url"
+              addonBefore="图片url"
               placeholder={gifUrl}
               defaultValue={gifUrl}
               onChange={event => {
@@ -568,11 +522,17 @@ class App extends React.Component {
           footer={null}
           onCancel={() => {
             this.setState({ previewGifVisible: false });
+            clearTimeout(this.t); //动画关闭就把动画删掉,要不然会报错
           }}
           wrapClassName="preview-gif-modal"
         >
           <canvas id="previewGif" width="300" height="300" />
         </Modal>
+        {spinVisible && (
+          <div className={styles['mask-wrapper']}>
+            <Spin size="large" />
+          </div>
+        )}
       </div>
     );
   }

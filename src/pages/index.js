@@ -1,28 +1,14 @@
 import React from 'react';
 import { fabric } from 'fabric';
-import { Upload, Button, Icon, Radio, Input, message, Modal } from 'antd';
-//import axios from 'axios';
-import './index.scss';
+import { Upload, Button, Icon, Radio, Input, message, Modal, Spin } from 'antd';
+import SuperGif from 'libgif';
+import styles from './index.scss';
 message.config({
-  maxCount: 1
+  maxCount: 1,
 });
-function loadBuffer(file, onload, onerror, onprogress) {
-  var fr;
-  fr = new FileReader();
-  fr.onload = function() {
-    onload(this.result);
-  };
-  fr.onerror = function() {
-    if (onerror) {
-      onerror(this.error);
-    }
-  };
-  fr.readAsArrayBuffer(file);
-}
 class App extends React.Component {
   constructor(props) {
     super(props);
-    this.handlerInputChange = this.handlerInputChange.bind(this);
     this.addFrames = this.addFrames.bind(this);
     this.reduceFrames = this.reduceFrames.bind(this);
     this.onChange = this.onChange.bind(this);
@@ -30,9 +16,16 @@ class App extends React.Component {
     this.state = {
       clipPartNum: 3, //gif分的段数 默认3段
       optionArr: [], //初始化数据,initData
-      previewGifVisible: false
+      previewGifVisible: false,
+      spinVisible: false,
+      timeinterval: 100,
     };
-    this.bgColorArr = ['rgba(0,0,0,0.3)', 'rgb(4, 250, 37, 0.3)', 'rgb(41, 4, 250, .3)', 'rgb(41, 4, 10, .3)'];
+    this.bgColorArr = [
+      'rgba(0,0,0,0.3)',
+      'rgb(4, 250, 37, 0.3)',
+      'rgb(41, 4, 250, .3)',
+      'rgb(41, 4, 10, .3)',
+    ];
     this.canvas_sprite = ''; //渲图片的canvas对象
     this.rects = [];
     this.texts = [];
@@ -44,8 +37,6 @@ class App extends React.Component {
 
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
-
-    //this.setState({ previewGifVisible: false });
     this.initData();
     let that = this;
     this.canvas_sprite.on('object:moving', function(e) {
@@ -67,11 +58,11 @@ class App extends React.Component {
       ) {
         obj.top = Math.min(
           obj.top,
-          obj.canvas.height - obj.getBoundingRect().height + obj.top - obj.getBoundingRect().top
+          obj.canvas.height - obj.getBoundingRect().height + obj.top - obj.getBoundingRect().top,
         );
         obj.left = Math.min(
           obj.left,
-          obj.canvas.width - obj.getBoundingRect().width + obj.left - obj.getBoundingRect().left
+          obj.canvas.width - obj.getBoundingRect().width + obj.left - obj.getBoundingRect().left,
         );
       }
       let { top, left, width, height } = e.target;
@@ -88,12 +79,68 @@ class App extends React.Component {
         textWidth: width,
         textHeight: height,
         left,
-        top
+        top,
       };
       that.setState({
-        optionArr: optionArrNew
+        optionArr: optionArrNew,
       });
     });
+  }
+  async pre_load_gif(gif_source) {
+    // 判断是gif格式则交给this.pre_load_gif函数处理
+    if (!/(image\/gif)/.test(gif_source.type)) {
+      message.error(`请上传gif格式的图片`, 2);
+      return;
+    }
+    try {
+      this.setState({
+        spinVisible: true,
+      });
+      const gifImg = document.createElement('img');
+      // gif库需要img标签配置下面两个属性
+      gifImg.setAttribute('rel:animated_src', URL.createObjectURL(gif_source));
+      gifImg.setAttribute('rel:auto_play', '0');
+      const div = document.createElement('div');
+      div.appendChild(gifImg); //防止报错
+      // 新建gif实例
+
+      var rub = new SuperGif({ gif: gifImg });
+      rub.load(() => {
+        var img_list = [];
+        for (let i = 1; i <= rub.get_length(); i++) {
+          // 遍历gif实例的每一帧
+          rub.move_to(i);
+          // 将每一帧的canvas转换成file对象
+          let cur_file = this.convertCanvasToImage(rub.get_canvas(), `gif-${i}`);
+          img_list.push({
+            file_name: cur_file.name,
+            url: URL.createObjectURL(cur_file),
+            file: cur_file,
+          });
+        }
+        this.img_list = img_list;
+        this.buildView();
+      });
+    } catch (error) {
+      message.error(`出错了${error}`, 2);
+      this.setState({
+        spinVisible: false,
+      });
+    }
+  }
+  convertCanvasToImage(canvas, filename) {
+    return this.dataURLtoFile(canvas.toDataURL('image/png'), filename);
+  }
+  dataURLtoFile(dataurl, filename) {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    var n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
   }
   initData() {
     let { clipPartNum } = this.state;
@@ -116,73 +163,37 @@ class App extends React.Component {
         imgWidth: '',
         imgHeight: '',
         textNumMax: 5, //最多文字数
-        isAddText: 1 //是否添加文字
+        isAddText: 1, //是否添加文字
       });
     }
     this.setState(
       {
-        optionArr: optionArr
+        optionArr: optionArr,
       },
       () => {
         this.handlerClipPartNum();
-      }
+      },
     );
-  }
-  componentWillUnmount() {}
-  handlerInputChange(file) {
-    let that = this;
-    if (/gif$/.test(file.type)) {
-      loadBuffer(
-        file,
-        function(buf) {
-          var gif;
-          gif = new window.Gif();
-          gif.onparse = function() {
-            setTimeout(function() {
-              that.buildView(gif, file.name, true);
-            }, 20);
-          };
-          gif.parse(buf);
-        },
-        function(e) {
-          alert(e);
-        }
-      );
-    } else {
-      alert('"' + file.name + '" not GIF');
-    }
   }
   onChange = e => {
     //console.log('radio checked', e.target.value);
     this.setState(
       {
-        clipPartNum: e.target.value
+        clipPartNum: e.target.value,
       },
       () => {
         this.initData();
-      }
+      },
     );
   };
-  buildView(gif, fname, preRender) {
-    let canvas_frame = '';
-    let context = '';
-    let frames = '';
+  buildView() {
     let canvas_sprite = this.canvas_sprite;
     let that = this;
     that.imgs = [];
-    canvas_frame = document.createElement('canvas');
-    canvas_frame.width = gif.header.width;
-    canvas_frame.height = gif.header.height;
-    context = canvas_frame.getContext('2d');
-    frames = gif.createFrameImages(context, preRender, !preRender);
+    that.clearCanvas();
     canvas_sprite.clear();
-    frames.forEach(function(frame, i) {
-      let canvas_frame;
-      canvas_frame = document.createElement('canvas');
-      canvas_frame.width = frame.image.width;
-      canvas_frame.height = frame.image.height;
-      canvas_frame.getContext('2d').putImageData(frame.image, 0, 0);
-      new fabric.Image.fromURL(canvas_frame.toDataURL(), function(img) {
+    this.img_list.forEach(function(frame, i) {
+      new fabric.Image.fromURL(frame.url, function(img) {
         let width = img.height * (300 / img.height);
         that.width = width;
         img.set({ selectable: false, fill: '#000000', width: width, height: 300 });
@@ -195,12 +206,12 @@ class App extends React.Component {
         let Line = new fabric.Line([img.height * i, 0, img.height * i, img.height], {
           selectable: false,
           fill: '#000000',
-          stroke: 'rgba(0,0,0,0.8)' //笔触颜色
+          stroke: 'rgba(0,0,0,0.8)', //笔触颜色
         });
         canvas_sprite.add(Line);
         canvas_sprite.renderAll();
-        that.framesLength = frames.length; //图片总帧数
-        if (i === frames.length - 1) that.handlerClipPartNum(); //加载为异步,必须在图片加载完成
+        that.framesLength = that.img_list.length; //图片总帧数
+        if (i === that.img_list.length - 1) that.handlerClipPartNum(); //加载为异步,必须在图片加载完成
       });
     });
   }
@@ -220,11 +231,14 @@ class App extends React.Component {
     }
     this.setState(
       {
-        optionArr: optionArrNew
+        optionArr: optionArrNew,
       },
       () => {
         this.renderFramesInit();
-      }
+        this.setState({
+          spinVisible: false,
+        });
+      },
     ); //分配完帧数,渲染矩形分割区和文字
   }
   //增加矩形 文字到各自的段数上
@@ -241,7 +255,7 @@ class App extends React.Component {
         fill: this.bgColorArr[i], //填充的颜色
         width: item.frames * this.width, //方形的宽度
         height: this.height, //方形的高度
-        selectable: false
+        selectable: false,
       });
       rects[i] = rect;
       canvas_sprite.add(rect);
@@ -252,7 +266,7 @@ class App extends React.Component {
         fontSize: item.fontSize, //文字大小
         lockRotation: true,
         fill: item.fontColor,
-        index: i
+        index: i,
       });
       texts[i] = text;
       canvas_sprite.add(text);
@@ -262,7 +276,6 @@ class App extends React.Component {
   clearCanvas() {
     let canvas_sprite = this.canvas_sprite;
     this.rects.forEach(function(item, i) {
-      console.log('item', item);
       if (item) {
         canvas_sprite.remove(item);
       }
@@ -293,11 +306,11 @@ class App extends React.Component {
     this.clearCanvas();
     this.setState(
       {
-        optionArr: optionArrNew
+        optionArr: optionArrNew,
       },
       () => {
         this.renderFramesInit();
-      }
+      },
     );
   }
   reduceFrames(i) {
@@ -316,11 +329,11 @@ class App extends React.Component {
     this.clearCanvas();
     this.setState(
       {
-        optionArr: optionArrNew
+        optionArr: optionArrNew,
       },
       () => {
         this.renderFramesInit();
-      }
+      },
     );
   }
   previewEffect() {
@@ -368,36 +381,35 @@ class App extends React.Component {
     img.left = 0;
     img.top = 0;
     let optionArr = this.state.optionArr;
-
     text.left = optionArr[textIndex].left;
     text.top = optionArr[textIndex].top;
     clearTimeout(this.t);
     return new Promise(res => {
       this.t = setTimeout(() => {
         canvas.clear();
-        canvas.add(img /* this.imgs[0] */);
-        canvas.add(text /* this.texts[0] */);
+        canvas.add(img);
+        canvas.add(text);
         canvas.renderAll();
         res();
-      }, 200);
+      }, this.state.timeinterval);
     });
   }
   render() {
     let that = this;
     const props = {
       beforeUpload(file) {
-        that.handlerInputChange(file);
-      }
+        that.pre_load_gif(file);
+      },
     };
-    const { optionArr, previewGifVisible } = this.state;
+    const { optionArr, previewGifVisible, timeinterval, spinVisible } = this.state;
     return (
-      <div id='main'>
-        <canvas id='merge' width='2000' height='300' />
-        <div className='box'>
+      <div id="main">
+        <canvas id="merge" width="2000" height="300" />
+        <div className="box">
           <div>
             <Upload {...props}>
               <Button>
-                <Icon type='upload' /> Click to Upload
+                <Icon type="upload" /> Click to Upload
               </Button>
             </Upload>
           </div>
@@ -408,62 +420,74 @@ class App extends React.Component {
               <Radio value={4}>四段</Radio>
             </Radio.Group>
           </div>
-          <div className='btn'>
-            <Button type='primary' onClick={this.previewEffect}>
+          <div className="input-timeinterval">
+            <Input
+              addonBefore="每帧时间间隔"
+              placeholder={timeinterval}
+              defaultValue={timeinterval}
+              onChange={event => {
+                this.setState({
+                  timeinterval: event.target.value,
+                });
+              }}
+            />
+          </div>
+          <div className="btn">
+            <Button type="primary" onClick={this.previewEffect}>
               预览效果
             </Button>
           </div>
         </div>
-        <div className='option'>
+        <div className="option">
           {optionArr.map((item, i) => {
             return (
-              <div key={i} className='option-li'>
-                <div className='row'>
-                  <div className='h3'>{item.name} </div>
+              <div key={i} className="option-li">
+                <div className="row">
+                  <div className="h3">{item.name} </div>
                 </div>
-                <div className='row'>
-                  <div className='h3'>帧数</div>
+                <div className="row">
+                  <div className="h3">帧数</div>
                   <Input placeholder={item.frames} defaultValue={item.frames} value={item.frames} />
                 </div>
-                <div className='row'>
-                  <div className='h3'>加减帧</div>
-                  <Button type='primary' onClick={this.addFrames.bind(this, i)}>
+                <div className="row">
+                  <div className="h3">加减帧</div>
+                  <Button type="primary" onClick={this.addFrames.bind(this, i)}>
                     +
                   </Button>
-                  <Button type='primary' onClick={this.reduceFrames.bind(this, i)}>
+                  <Button type="primary" onClick={this.reduceFrames.bind(this, i)}>
                     -
                   </Button>
                 </div>
-                <div className='row'>
-                  <div className='h3'>文字内容</div>
+                <div className="row">
+                  <div className="h3">文字内容</div>
                   <Input placeholder={item.text + (i + 1)} defaultValue={item.text + (i + 1)} />
                 </div>
-                <div className='row'>
-                  <div className='h3'>最大字数</div>
+                <div className="row">
+                  <div className="h3">最大字数</div>
                   <Input placeholder={item.textNumMax} defaultValue={item.textNumMax} />
                 </div>
-                <div className='row'>
-                  <div className='h3'>是否添加文字</div>
-                  <div className='radio-group'>
+                <div className="row">
+                  <div className="h3">是否添加文字</div>
+                  <div className="radio-group">
                     <Radio.Group onChange={this.handerChangeisAddText} value={item.isAddText}>
                       <Radio value={1}>是</Radio>
                       <Radio value={0}>否</Radio>
                     </Radio.Group>
                   </div>
                 </div>
-                <div className='row'>
-                  <div className='h3'>字号</div>
+                <div className="row">
+                  <div className="h3">字号</div>
                   <Input placeholder={item.fontSize} defaultValue={item.fontSize} />
                 </div>
-                <div className='row'>
-                  <div className='h3'>起始坐标</div>
-                  <div className='h4'>
+                <div className="row">
+                  <div className="h3">起始坐标</div>
+                  <div className="h4">
                     {item.left},{item.top}
                   </div>
                 </div>
-                <div className='row'>
-                  <div className='h3'>结束坐标</div>
-                  <div className='h4'>
+                <div className="row">
+                  <div className="h3">结束坐标</div>
+                  <div className="h4">
                     {item.left + item.textWidth},{item.top + item.textHeight}
                   </div>
                 </div>
@@ -472,16 +496,22 @@ class App extends React.Component {
           })}
         </div>
         <Modal
-          title='效果'
+          title="效果"
           visible={previewGifVisible}
           footer={null}
           onCancel={() => {
             this.setState({ previewGifVisible: false });
+            clearTimeout(this.t); //动画关闭就把动画删掉,要不然会报错
           }}
-          wrapClassName='preview-gif-modal'
+          wrapClassName="preview-gif-modal"
         >
-          <canvas id='previewGif' width='300' height='300' />
+          <canvas id="previewGif" width="300" height="300" />
         </Modal>
+        {spinVisible && (
+          <div className={styles['mask-wrapper']}>
+            <Spin size="large" />
+          </div>
+        )}
       </div>
     );
   }

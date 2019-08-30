@@ -1,29 +1,3 @@
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 15px;
-  line-height: 25px;
-}
-
-th {
-  background-color: #eee;
-}
-
-td,
-th {
-  text-align: center;
-}
-
-td:first-child {
-  text-align: left;
-}
-
-input {
-  min-width: 300px;
-  border: 1px solid #999;
-  border-radius: 2px;
-  line-height: 25px;
-}
 .preview-gif-modal {
   #previewGif {
     background: rgba(0, 0, 0, 0.03);
@@ -83,8 +57,22 @@ input {
   }
 }
 .input-timeinterval {
-  .ant-input {
+  .ant-input-group .ant-input {
     width: 100px;
     min-width: 100px;
   }
+}
+.url-input {
+  width: 500px;
+}
+.mask-wrapper {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
