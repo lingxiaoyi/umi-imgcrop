@@ -2,6 +2,7 @@ import React from 'react';
 import { fabric } from 'fabric';
 import { /* Upload,  */ Button, /* Icon, */ Radio, Input, message, Modal } from 'antd';
 import utils from '@/utils/utils.js';
+import SuperGif from 'libgif';
 //import axios from 'axios';
 import '../index.scss';
 message.config({
@@ -126,7 +127,7 @@ class App extends React.Component {
       div.appendChild(gifImg); //防止报错
       // 新建gif实例
 
-      var rub = new window.SuperGif({ gif: gifImg });
+      var rub = new SuperGif({ gif: gifImg });
       rub.load(() => {
         var img_list = [];
         for (let i = 1; i <= rub.get_length(); i++) {
