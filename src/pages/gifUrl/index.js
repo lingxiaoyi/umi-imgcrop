@@ -1,6 +1,7 @@
 import React from 'react';
 import { fabric } from 'fabric';
-import { Upload, Button, Icon, Radio, Input, message, Modal } from 'antd';
+import { /* Upload,  */ Button, /* Icon, */ Radio, Input, message, Modal } from 'antd';
+import utils from '@/utils/utils.js';
 //import axios from 'axios';
 import '../index.scss';
 message.config({
@@ -31,6 +32,8 @@ class App extends React.Component {
       clipPartNum: 3, //gif分的段数 默认3段
       optionArr: [], //初始化数据,initData
       previewGifVisible: false,
+      timeinterval: 100,
+      gifUrl: 'http://127.0.0.1:5500/example_gifs/spin.gif',
     };
     this.bgColorArr = [
       'rgba(0,0,0,0.3)',
@@ -49,7 +52,7 @@ class App extends React.Component {
 
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
-    this.pre_load_gif();
+    this.pre_load_gif(this.state.gifUrl);
     //this.setState({ previewGifVisible: false });
     this.initData();
     let that = this;
@@ -100,30 +103,49 @@ class App extends React.Component {
       });
     });
   }
-  pre_load_gif(gif_source) {
-    const gifImg = document.createElement('img');
-    // gif库需要img标签配置下面两个属性
-    gifImg.setAttribute('rel:animated_src', 'http://127.0.0.1:5500/example_gifs/spin.gif');
-    gifImg.setAttribute('rel:auto_play', '0');
-    // 新建gif实例
-    var rub = new window.SuperGif({ gif: gifImg });
-    rub.load(() => {
-      console.log('rub', rub.get_length());
-      var img_list = [];
-      for (let i = 1; i <= rub.get_length(); i++) {
-        // 遍历gif实例的每一帧
-        rub.move_to(i);
-        // 将每一帧的canvas转换成file对象
-        let cur_file = this.convertCanvasToImage(rub.get_canvas(), `gif-${i}`);
-        img_list.push({
-          file_name: cur_file.name,
-          url: URL.createObjectURL(cur_file),
-          file: cur_file,
-        });
-      }
-      this.img_list = img_list;
-      this.buildView();
-    });
+  async pre_load_gif(gif_source) {
+    if (!utils.IsURL(gif_source)) {
+      message.error(`链接地址错误,请仔细检查`, 2);
+      return;
+    }
+    if (gif_source.indexOf('.gif') === -1) {
+      message.error(`请输入gif图片地址`, 2);
+      return;
+    }
+    let res = await utils.CheckImgExists(gif_source);
+    if (!res) {
+      message.error(`图片加载失败,请输入正确的图片链接地址`, 2);
+      return;
+    }
+    try {
+      const gifImg = document.createElement('img');
+      // gif库需要img标签配置下面两个属性
+      gifImg.setAttribute('rel:animated_src', gif_source);
+      gifImg.setAttribute('rel:auto_play', '0');
+      const div = document.createElement('div');
+      div.appendChild(gifImg); //防止报错
+      // 新建gif实例
+
+      var rub = new window.SuperGif({ gif: gifImg });
+      rub.load(() => {
+        var img_list = [];
+        for (let i = 1; i <= rub.get_length(); i++) {
+          // 遍历gif实例的每一帧
+          rub.move_to(i);
+          // 将每一帧的canvas转换成file对象
+          let cur_file = this.convertCanvasToImage(rub.get_canvas(), `gif-${i}`);
+          img_list.push({
+            file_name: cur_file.name,
+            url: URL.createObjectURL(cur_file),
+            file: cur_file,
+          });
+        }
+        this.img_list = img_list;
+        this.buildView();
+      });
+    } catch (error) {
+      message.error(`出错了${error}`, 2);
+    }
   }
   convertCanvasToImage(canvas, filename) {
     return this.dataURLtoFile(canvas.toDataURL('image/png'), filename);
@@ -410,28 +432,52 @@ class App extends React.Component {
         canvas.add(text /* this.texts[0] */);
         canvas.renderAll();
         res();
-      }, 200);
+      }, this.state.timeinterval);
     });
   }
   render() {
-    let that = this;
+    /* let that = this;
     const props = {
       beforeUpload(file) {
         that.handlerInputChange(file);
       },
-    };
-    const { optionArr, previewGifVisible } = this.state;
+    }; */
+    const { optionArr, previewGifVisible, timeinterval, gifUrl } = this.state;
     return (
       <div id="main">
-        <div>gifUrl</div>
         <canvas id="merge" width="2000" height="300" />
         <div className="box">
           <div>
-            <Upload {...props}>
+            {/* <Upload {...props}>
               <Button>
                 <Icon type="upload" /> Click to Upload
               </Button>
-            </Upload>
+            </Upload> */}
+            <Input
+              addonBefore="添加gif图片url"
+              placeholder={gifUrl}
+              defaultValue={gifUrl}
+              onChange={event => {
+                this.setState(
+                  {
+                    gifUrl: event.target.value,
+                  },
+                  () => {
+                    this.pre_load_gif(this.state.gifUrl);
+                  },
+                );
+              }}
+            />
+          </div>
+          <div className="btn">
+            <Button
+              type="primary"
+              onClick={() => {
+                this.pre_load_gif(gifUrl);
+              }}
+            >
+              添加图片
+            </Button>
           </div>
           <div>
             <Radio.Group onChange={this.onChange} value={this.state.clipPartNum}>
@@ -439,6 +485,18 @@ class App extends React.Component {
               <Radio value={3}>三段</Radio>
               <Radio value={4}>四段</Radio>
             </Radio.Group>
+          </div>
+          <div className="input-timeinterval">
+            <Input
+              addonBefore="每帧时间间隔"
+              placeholder={timeinterval}
+              defaultValue={timeinterval}
+              onChange={event => {
+                this.setState({
+                  timeinterval: event.target.value,
+                });
+              }}
+            />
           </div>
           <div className="btn">
             <Button type="primary" onClick={this.previewEffect}>
