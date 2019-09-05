@@ -208,7 +208,7 @@ class App extends React.Component {
       new fabric.Image.fromURL(frame.url, function(img) {
         let width = img.height * (300 / img.height);
         that.width = width;
-        img.set({ selectable: false, fill: '#000000', width: width, height: 300 });
+        img.set({ selectable: false, fill: 'rgba(0,0,0,0)', width: width, height: 300 });
         img.left = img.width * i;
         canvas_sprite.setHeight(img.height);
         canvas_sprite.setWidth(img.height * (i + 1));
@@ -356,7 +356,9 @@ class App extends React.Component {
     this.setState({ previewGifVisible: true }, () => {
       clearTimeout(this.t2);
       this.t2 = setTimeout(() => {
-        this.canvas_previewGif = new fabric.Canvas('previewGif');
+        this.canvas_previewGif = new fabric.Canvas('previewGif', {
+          backgroundColor: '#ffffff',
+        });
         this.composeGif();
       }, 10);
     });
@@ -411,6 +413,9 @@ class App extends React.Component {
     return new Promise(res => {
       that.t = setTimeout(() => {
         canvas.clear();
+        canvas.set({
+          backgroundColor: '#ffffff',
+        });
         canvas.add(img);
         canvas.add(text);
         canvas.renderAll();
@@ -423,6 +428,10 @@ class App extends React.Component {
   }
   createGIF() {
     let that = this;
+    if (!that.toDataURL.length) {
+      message.error(`请先添加gif图片`, 2);
+      return;
+    }
     gifshot.createGIF(
       {
         images: this.toDataURL,
