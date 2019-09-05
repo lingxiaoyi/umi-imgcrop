@@ -3,6 +3,7 @@ import { fabric } from 'fabric';
 import { Button, Radio, Input, message, Modal, Spin } from 'antd';
 import utils from '@/utils/utils.js';
 import SuperGif from 'libgif';
+import gifshot from 'gifshot';
 //import axios from 'axios';
 import styles from '../index.scss';
 message.config({
@@ -20,8 +21,10 @@ class App extends React.Component {
       optionArr: [], //初始化数据,initData
       previewGifVisible: false,
       spinVisible: false,
-      timeinterval: 100,
+      timeinterval: 0.1, //最小支持0.02
       gifUrl: 'http://img.mp.itc.cn/upload/20170721/04b9fde60b6d4951a666fda733811ff7.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
+      previewGifImgUrl: '',
+      isPreviewEffect: true, //true预览图片 false生成图片2种类型
     };
     this.bgColorArr = [
       'rgba(0,0,0,0.3)',
@@ -33,6 +36,7 @@ class App extends React.Component {
     this.rects = [];
     this.texts = [];
     this.imgs = [];
+    this.toDataURL = []; //生成的每一个图片帧
     this.height = 300; //固定死
     this.width = 0; //通过实际宽高比计算出来的
     this.framesLength = 0;
@@ -344,7 +348,11 @@ class App extends React.Component {
       },
     );
   }
-  previewEffect() {
+  previewEffect(status) {
+    this.setState({
+      spinVisible: true,
+      isPreviewEffect: status,
+    });
     this.setState({ previewGifVisible: true }, () => {
       clearTimeout(this.t2);
       this.t2 = setTimeout(() => {
@@ -360,6 +368,7 @@ class App extends React.Component {
     let textIndex = 0;
     let frames = [];
     let length = 0;
+    this.toDataURL = [];
     for (let index = 0; index < optionArr.length; index++) {
       length += optionArr[index].frames;
       frames.push(length);
@@ -376,12 +385,19 @@ class App extends React.Component {
       let img = fabric.util.object.clone(this.imgs[index]);
       let text = fabric.util.object.clone(this.texts[textIndex]);
       await this.addGifFrame(canvas, img, text, textIndex);
-
-      if (index >= framesLength - 1) {
-        this.composeGifT = setTimeout(() => {
-          this.composeGif();
-        }, 10);
+      if (this.state.isPreviewEffect) {
+        if (index >= framesLength - 1) {
+          this.composeGifT = setTimeout(() => {
+            this.composeGif();
+            this.setState({
+              spinVisible: false,
+            });
+          }, 10);
+        }
       }
+    }
+    if (!this.state.isPreviewEffect) {
+      this.createGIF(); //生成gif
     }
   }
   addGifFrame(canvas, img, text, textIndex) {
@@ -390,19 +406,58 @@ class App extends React.Component {
     let optionArr = this.state.optionArr;
     text.left = optionArr[textIndex].left;
     text.top = optionArr[textIndex].top;
+    let that = this;
     clearTimeout(this.t);
     return new Promise(res => {
-      this.t = setTimeout(() => {
+      that.t = setTimeout(() => {
         canvas.clear();
         canvas.add(img);
         canvas.add(text);
         canvas.renderAll();
+        if (!that.state.isPreviewEffect) {
+          that.toDataURL.push(canvas.toDataURL('png'));
+        }
         res();
-      }, this.state.timeinterval);
+      }, that.state.timeinterval * 1000);
     });
   }
+  createGIF() {
+    let that = this;
+    gifshot.createGIF(
+      {
+        images: this.toDataURL,
+        gifWidth: 300,
+        // Desired height of the image
+        gifHeight: 300,
+        interval: this.state.timeinterval / 1,
+        //frameDuration: this.state.timeinterval / 1,
+      },
+      function(obj) {
+        if (!obj.error) {
+          let image = obj.image;
+          that.setState({ previewGifImgUrl: image });
+          /* let animatedImage = document.createElement('img');
+          animatedImage.src = image;
+          document.body.appendChild(animatedImage); */
+        } else {
+          message.error(`图片生成错误,请重新尝试`, 2);
+        }
+        that.setState({
+          spinVisible: false,
+        });
+      },
+    );
+  }
   render() {
-    const { optionArr, previewGifVisible, timeinterval, gifUrl, spinVisible } = this.state;
+    const {
+      optionArr,
+      previewGifVisible,
+      timeinterval,
+      gifUrl,
+      spinVisible,
+      previewGifImgUrl,
+      isPreviewEffect,
+    } = this.state;
     return (
       <div id="main">
         <canvas id="merge" width="2000" height="300" />
@@ -446,6 +501,11 @@ class App extends React.Component {
               addonBefore="每帧时间间隔"
               placeholder={timeinterval}
               defaultValue={timeinterval}
+              onBlur={event => {
+                if (event.target.value < 0.02) {
+                  message.error(`生成图片最小仅支持0.02数值,预览效果可以输入任何值`, 3);
+                }
+              }}
               onChange={event => {
                 this.setState({
                   timeinterval: event.target.value,
@@ -454,8 +514,13 @@ class App extends React.Component {
             />
           </div>
           <div className="btn">
-            <Button type="primary" onClick={this.previewEffect}>
+            <Button type="primary" onClick={this.previewEffect.bind(this, true)}>
               预览效果
+            </Button>
+          </div>
+          <div className="btn">
+            <Button type="primary" onClick={this.previewEffect.bind(this, false)}>
+              生成图片
             </Button>
           </div>
         </div>
@@ -526,7 +591,21 @@ class App extends React.Component {
           }}
           wrapClassName="preview-gif-modal"
         >
-          <canvas id="previewGif" width="300" height="300" />
+          <div className={isPreviewEffect ? '' : 'hide'}>
+            <canvas id="previewGif" width="300" height="300" />
+          </div>
+          {!isPreviewEffect && (
+            <div>
+              <img id="previewGifImg" src={previewGifImgUrl} alt="" />
+              <div className="btn-createGIF">
+                <a href={previewGifImgUrl} download={previewGifImgUrl}>
+                  <Button type="primary" onClick={() => {}}>
+                    下载图片
+                  </Button>
+                </a>
+              </div>
+            </div>
+          )}
         </Modal>
         {spinVisible && (
           <div className={styles['mask-wrapper']}>
