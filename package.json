@@ -1,11 +1,16 @@
 {
+  "name": "umi-imgcrop",
+  "version": "0.1.0",
+  "homepage": "https://lingxiaoyi.github.io/umi-imgcrop",
   "private": true,
   "scripts": {
     "start": "umi dev",
     "build": "umi build",
     "test": "umi test",
     "lint": "eslint --ext .js src mock tests",
-    "precommit": "lint-staged"
+    "precommit": "lint-staged",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "antd": "^3.19.5",
@@ -23,6 +28,7 @@
     "eslint-plugin-import": "^2.14.0",
     "eslint-plugin-jsx-a11y": "^5.1.1",
     "eslint-plugin-react": "^7.11.1",
+    "gh-pages": "^2.1.1",
     "husky": "^0.14.3",
     "lint-staged": "^7.2.2",
     "node-sass": "^4.12.0",
