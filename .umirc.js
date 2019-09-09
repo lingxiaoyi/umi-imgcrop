@@ -19,7 +19,17 @@ export default {
     ],
   ],
   sass: {},
-
+  outputPath: './build',
+  publicPath: '/umi-imgcrop/',
+  base: '/umi-imgcrop/',
+  history: 'hash',
+  //runtimePublicPath: true,
+  copy: [
+    {
+      from: `${__dirname}/src/assets/favicon.ico`,
+      to: `${__dirname}/build/assets/favicon.ico`,
+    },
+  ],
   cssLoaderOptions: {
     localIdentName: '[local]',
   },

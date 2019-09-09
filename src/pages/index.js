@@ -41,7 +41,7 @@ class App extends React.Component {
 
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
-    this.initData();
+    //this.initData();
     let that = this;
     this.canvas_sprite.on('object:moving', function(e) {
       var obj = e.target;
@@ -123,6 +123,7 @@ class App extends React.Component {
           });
         }
         this.img_list = img_list;
+        this.initData();
         this.buildView();
       });
     } catch (error) {
@@ -178,6 +179,8 @@ class App extends React.Component {
         this.handlerClipPartNum();
       },
     );
+
+    console.log('optionArr', optionArr);
   }
   onChange = e => {
     //console.log('radio checked', e.target.value);
@@ -198,16 +201,28 @@ class App extends React.Component {
     canvas_sprite.clear();
     this.img_list.forEach(function(frame, i) {
       new fabric.Image.fromURL(frame.url, function(img) {
-        let width = img.height * (300 / img.height);
+        let width = 300;
+        let scale = width / img.width;
+        let height = img.height * scale;
         that.width = width;
-        img.set({ selectable: false, fill: '#ffffff', width: width, height: 300 });
-        img.left = img.width * i;
-        canvas_sprite.setHeight(img.height);
-        canvas_sprite.setWidth(img.height * (i + 1));
+        that.height = height;
+        img.set({
+          selectable: false,
+          fill: 'rgba(0,0,0,0)',
+          width: img.width,
+          height: img.height,
+          scaleX: scale,
+          scaleY: scale,
+          originX: 'left',
+          originY: 'top',
+        });
+        img.left = img.width * scale * i;
+        canvas_sprite.setHeight(height);
+        canvas_sprite.setWidth(width * (i + 1));
         canvas_sprite.add(img);
         that.imgs.push(img);
         //加线进来
-        let Line = new fabric.Line([img.height * i, 0, img.height * i, img.height], {
+        let Line = new fabric.Line([width * i, 0, width * i, height], {
           selectable: false,
           fill: '#000000',
           stroke: 'rgba(0,0,0,0.8)', //笔触颜色
@@ -350,6 +365,8 @@ class App extends React.Component {
       this.t2 = setTimeout(() => {
         this.canvas_previewGif = new fabric.Canvas('previewGif', {
           backgroundColor: '#ffffff',
+          width: this.width,
+          height: this.height,
         });
         this.composeGif();
       }, 10);
@@ -420,7 +437,6 @@ class App extends React.Component {
   }
   createGIF() {
     let that = this;
-    console.log('that.toDataURL', that.toDataURL);
     if (!that.toDataURL.length) {
       message.error(`请先添加gif图片`, 2);
       that.setState({
@@ -431,9 +447,9 @@ class App extends React.Component {
     gifshot.createGIF(
       {
         images: this.toDataURL,
-        gifWidth: 300,
+        gifWidth: this.width,
         // Desired height of the image
-        gifHeight: 300,
+        gifHeight: this.height,
         interval: this.state.timeinterval / 1,
         //frameDuration: this.state.timeinterval / 1,
       },
@@ -586,7 +602,12 @@ class App extends React.Component {
           </div>
           {!isPreviewEffect && (
             <div>
-              <img id="previewGifImg" src={previewGifImgUrl} alt="" />
+              <img
+                id="previewGifImg"
+                src={previewGifImgUrl}
+                alt=""
+                style={{ width: this.width, height: this.height }}
+              />
               <div className="btn-createGIF">
                 <a href={previewGifImgUrl} download={previewGifImgUrl}>
                   <Button type="primary" onClick={() => {}}>

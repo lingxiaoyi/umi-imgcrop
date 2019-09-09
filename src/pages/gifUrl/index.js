@@ -22,7 +22,8 @@ class App extends React.Component {
       previewGifVisible: false,
       spinVisible: false,
       timeinterval: 0.1, //最小支持0.02
-      gifUrl: 'http://img.mp.itc.cn/upload/20170721/04b9fde60b6d4951a666fda733811ff7.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
+      gifUrl:
+        'https://5b0988e595225.cdn.sohucs.com/images/20190813/f181cb0e5906476e893019ec50cd6615.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
       previewGifImgUrl: '',
       isPreviewEffect: true, //true预览图片 false生成图片2种类型
     };
@@ -45,7 +46,7 @@ class App extends React.Component {
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
     this.pre_load_gif(this.state.gifUrl);
-    this.initData();
+    //this.initData();
     let that = this;
     this.canvas_sprite.on('object:moving', function(e) {
       var obj = e.target;
@@ -134,6 +135,7 @@ class App extends React.Component {
           });
         }
         this.img_list = img_list;
+        this.initData();
         this.buildView();
       });
     } catch (error) {
@@ -206,16 +208,28 @@ class App extends React.Component {
     canvas_sprite.clear();
     this.img_list.forEach(function(frame, i) {
       new fabric.Image.fromURL(frame.url, function(img) {
-        let width = img.height * (300 / img.height);
+        let width = 300;
+        let scale = width / img.width;
+        let height = img.height * scale;
         that.width = width;
-        img.set({ selectable: false, fill: 'rgba(0,0,0,0)', width: width, height: 300 });
-        img.left = img.width * i;
-        canvas_sprite.setHeight(img.height);
-        canvas_sprite.setWidth(img.height * (i + 1));
+        that.height = height;
+        img.set({
+          selectable: false,
+          fill: 'rgba(0,0,0,0)',
+          width: img.width,
+          height: img.height,
+          scaleX: scale,
+          scaleY: scale,
+          originX: 'left',
+          originY: 'top',
+        });
+        img.left = img.width * scale * i;
+        canvas_sprite.setHeight(height);
+        canvas_sprite.setWidth(width * (i + 1));
         canvas_sprite.add(img);
         that.imgs.push(img);
         //加线进来
-        let Line = new fabric.Line([img.height * i, 0, img.height * i, img.height], {
+        let Line = new fabric.Line([width * i, 0, width * i, height], {
           selectable: false,
           fill: '#000000',
           stroke: 'rgba(0,0,0,0.8)', //笔触颜色
@@ -358,6 +372,8 @@ class App extends React.Component {
       this.t2 = setTimeout(() => {
         this.canvas_previewGif = new fabric.Canvas('previewGif', {
           backgroundColor: '#ffffff',
+          width: this.width,
+          height: this.height,
         });
         this.composeGif();
       }, 10);
@@ -435,9 +451,9 @@ class App extends React.Component {
     gifshot.createGIF(
       {
         images: this.toDataURL,
-        gifWidth: 300,
+        gifWidth: this.width,
         // Desired height of the image
-        gifHeight: 300,
+        gifHeight: this.height,
         interval: this.state.timeinterval / 1,
         //frameDuration: this.state.timeinterval / 1,
       },
@@ -605,7 +621,12 @@ class App extends React.Component {
           </div>
           {!isPreviewEffect && (
             <div>
-              <img id="previewGifImg" src={previewGifImgUrl} alt="" />
+              <img
+                id="previewGifImg"
+                src={previewGifImgUrl}
+                alt=""
+                style={{ width: this.width, height: this.height }}
+              />
               <div className="btn-createGIF">
                 <a href={previewGifImgUrl} download={previewGifImgUrl}>
                   <Button type="primary" onClick={() => {}}>
