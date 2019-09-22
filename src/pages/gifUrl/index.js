@@ -15,6 +15,8 @@ class App extends React.Component {
     this.addFrames = this.addFrames.bind(this);
     this.reduceFrames = this.reduceFrames.bind(this);
     this.onChange = this.onChange.bind(this);
+    this.changeObjectText = this.changeObjectText.bind(this);
+    this.changeObjectFontSize = this.changeObjectFontSize.bind(this);
     this.previewEffect = this.previewEffect.bind(this);
     this.state = {
       clipPartNum: 3, //gif分的段数 默认3段
@@ -76,9 +78,7 @@ class App extends React.Component {
       }
       let { top, left, width, height } = e.target;
       let { optionArr } = that.state;
-      let optionArrIndex = optionArr.findIndex(function(item) {
-        return item.text === e.target.text;
-      });
+      let optionArrIndex = e.target.index;
       let optionArrNew = JSON.parse(JSON.stringify(optionArr));
       for (let index = 0; index < optionArrIndex; index++) {
         left -= optionArrNew[index].frames * that.width;
@@ -286,13 +286,14 @@ class App extends React.Component {
       rects[i] = rect;
       canvas_sprite.add(rect);
 
-      let text = new fabric.Text(item.text, {
+      let text = new fabric.Textbox(item.text, {
         left: left, //距离画布左侧的距离，单位是像素
         top: 0, //距离画布上边的距离
         fontSize: item.fontSize, //文字大小
-        lockRotation: true,
+        //lockRotation: true,
         fill: item.fontColor,
         index: i,
+        editable: true,
       });
       texts[i] = text;
       canvas_sprite.add(text);
@@ -361,6 +362,21 @@ class App extends React.Component {
         this.renderFramesInit();
       },
     );
+  }
+  changeObjectText(i, e) {
+    let texts = this.texts;
+    texts[i].set({
+      text: e.target.value,
+    });
+    this.canvas_sprite.renderAll();
+  }
+  changeObjectFontSize(i, e) {
+    let texts = this.texts;
+    texts[i].set({
+      fontSize: e.target.value / 1,
+      width: '',
+    });
+    this.canvas_sprite.renderAll();
   }
   previewEffect(status) {
     this.setState({
@@ -558,7 +574,12 @@ class App extends React.Component {
                 </div>
                 <div className="row">
                   <div className="h3">帧数</div>
-                  <Input placeholder={item.frames} defaultValue={item.frames} value={item.frames} />
+                  <Input
+                    placeholder={item.frames}
+                    defaultValue={item.frames}
+                    value={item.frames}
+                    disabled
+                  />
                 </div>
                 <div className="row">
                   <div className="h3">加减帧</div>
@@ -571,9 +592,13 @@ class App extends React.Component {
                 </div>
                 <div className="row">
                   <div className="h3">文字内容</div>
-                  <Input placeholder={item.text + (i + 1)} defaultValue={item.text + (i + 1)} />
+                  <Input
+                    placeholder={item.text}
+                    defaultValue={item.text}
+                    onChange={this.changeObjectText.bind(this, i)}
+                  />
                 </div>
-                <div className="row">
+                {/* <div className="row">
                   <div className="h3">最大字数</div>
                   <Input placeholder={item.textNumMax} defaultValue={item.textNumMax} />
                 </div>
@@ -585,10 +610,14 @@ class App extends React.Component {
                       <Radio value={0}>否</Radio>
                     </Radio.Group>
                   </div>
-                </div>
+                </div> */}
                 <div className="row">
                   <div className="h3">字号</div>
-                  <Input placeholder={item.fontSize} defaultValue={item.fontSize} />
+                  <Input
+                    placeholder={item.fontSize}
+                    defaultValue={item.fontSize}
+                    onChange={this.changeObjectFontSize.bind(this, i)}
+                  />
                 </div>
                 <div className="row">
                   <div className="h3">起始坐标</div>
