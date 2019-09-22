@@ -15,6 +15,7 @@ class App extends React.Component {
     this.onChange = this.onChange.bind(this);
     this.changeObjectText = this.changeObjectText.bind(this);
     this.changeObjectFontSize = this.changeObjectFontSize.bind(this);
+    this.changeObjectColor = this.changeObjectColor.bind(this);
     this.previewEffect = this.previewEffect.bind(this);
     this.state = {
       clipPartNum: 3, //gif分的段数 默认3段
@@ -160,7 +161,7 @@ class App extends React.Component {
         frames: 2, //帧数
         fontSize: '45',
         text: `测试内容${index + 1}`,
-        fontColor: 'red',
+        fontColor: '#ff0000',
         textWidth: 0,
         textHeight: 0,
         left: 0,
@@ -367,6 +368,13 @@ class App extends React.Component {
     texts[i].set({
       fontSize: e.target.value / 1,
       width: '',
+    });
+    this.canvas_sprite.renderAll();
+  }
+  changeObjectColor(i, e) {
+    let texts = this.texts;
+    texts[i].set({
+      fill: e.target.value,
     });
     this.canvas_sprite.renderAll();
   }
@@ -597,6 +605,14 @@ class App extends React.Component {
                     placeholder={item.fontSize}
                     defaultValue={item.fontSize}
                     onChange={this.changeObjectFontSize.bind(this, i)}
+                  />
+                </div>
+                <div className="row">
+                  <div className="h3">字体颜色</div>
+                  <Input
+                    placeholder={item.fontColor}
+                    defaultValue={item.fontColor}
+                    onChange={this.changeObjectColor.bind(this, i)}
                   />
                 </div>
                 <div className="row">
