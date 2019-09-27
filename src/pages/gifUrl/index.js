@@ -17,6 +17,7 @@ class App extends React.Component {
     this.addFrames = this.addFrames.bind(this);
     this.reduceFrames = this.reduceFrames.bind(this);
     this.changeOptionArr = this.changeOptionArr.bind(this);
+    this.changeTextsSetting = this.changeTextsSetting.bind(this);
     this.updateObject = this.updateObject.bind(this);
     this.changeActiveObjectValue = this.changeActiveObjectValue.bind(this);
     this.previewEffect = this.previewEffect.bind(this);
@@ -31,22 +32,30 @@ class App extends React.Component {
         '',
       isPreviewEffect: true, //true预览图片 false生成图片2种类型
       displayColorPicker: [false, false, false, false],
-      settingAll: [
+      textsSetting: [
+        {
+          value: '再爱我一次',
+          key: 'text',
+          name: '文字内容',
+        },
         {
           value: 40,
           key: 'fontSize',
           name: '字号',
         },
         {
-          fill: '#00000',
+          value: '#000000',
+          key: 'fill',
           name: '文字颜色',
         },
         {
-          fill: 'left',
+          value: 0,
+          key: 'left',
           name: '左边距',
         },
         {
-          fill: '#top',
+          value: 0,
+          key: 'top',
           name: '上边距',
         },
       ],
@@ -217,6 +226,33 @@ class App extends React.Component {
       },
       () => {
         this.updateObject(i);
+      },
+    );
+  }
+  changeTextsSetting(i, type, e) {
+    let newOptionArr = _.clone(this.state.optionArr);
+    let newTextsSetting = _.clone(this.state.textsSetting);
+    if (type === 'fill') {
+      newTextsSetting[i].value = e.hex;
+    } else {
+      newTextsSetting[i].value = e.target.value;
+    }
+    newOptionArr.forEach((item, i2) => {
+      if (type === 'fill') {
+        newOptionArr[i2][type] = e.hex;
+      } else {
+        newOptionArr[i2][type] = e.target.value;
+      }
+    });
+    this.setState(
+      {
+        optionArr: newOptionArr,
+        textsSetting: newTextsSetting,
+      },
+      () => {
+        this.state.optionArr.forEach((item, i)=>{
+          this.updateObject(i);
+        })
       },
     );
   }
@@ -703,7 +739,7 @@ class App extends React.Component {
                   />
                 </div>
                 <div className="row">
-                  <div className="h3">字体颜色</div>
+                  <div className="h3">文字颜色</div>
                   <div>
                     <div
                       style={styles.swatch}
@@ -768,70 +804,85 @@ class App extends React.Component {
           })}
           <div className="option-li">
             <div className="row">
-              <div className="h3">操作所有文字</div>
+              <h3>修改全部文字状态</h3>
             </div>
-            {this.state.settingAll.map(item => {
-              return (
-                <div className="row">
-                  <div className="h3">字号</div>
-                  <Input
-                    value={item.fontSize}
-                    defaultValue={item.fontSize}
-                    onChange={this.changeOptionArr.bind(this, i, 'fontSize')}
-                  />
-                </div>
-              );
-            })}
-
-            <div className="row">
-              <div className="h3">字体颜色</div>
-              <div>
-                <div
-                  style={styles.swatch}
-                  onClick={() => {
-                    let displayColorPickerNew = _.cloneDeep(displayColorPicker);
-                    displayColorPickerNew[i] = true;
-                    this.setState({
-                      displayColorPicker: displayColorPickerNew,
-                    });
-                  }}
-                >
-                  <div style={styles.color} />
-                </div>
-                {displayColorPicker[i] ? (
-                  <div style={styles.popover}>
-                    <div
-                      style={styles.cover}
-                      onClick={() => {
-                        this.setState({
-                          displayColorPicker: [false, false, false, false],
-                        });
-                      }}
-                    />
-                    <SketchPicker
-                      color={item.fill}
-                      onChange={this.changeOptionArr.bind(this, i, 'fill')}
+            {this.state.textsSetting.map((item, i) => {
+              if (item.key === 'fill') {
+                const styles = reactCSS({
+                  default: {
+                    color: {
+                      width: '36px',
+                      height: '14px',
+                      borderRadius: '2px',
+                      background: `${item.value}`,
+                    },
+                    swatch: {
+                      padding: '5px',
+                      background: '#fff',
+                      borderRadius: '1px',
+                      boxShadow: '0 0 0 1px rgba(0,0,0,.1)',
+                      display: 'inline-block',
+                      cursor: 'pointer',
+                    },
+                    popover: {
+                      position: 'absolute',
+                      zIndex: '2',
+                    },
+                    cover: {
+                      position: 'fixed',
+                      top: '0px',
+                      right: '0px',
+                      bottom: '0px',
+                      left: '0px',
+                    },
+                  },
+                });
+                return (
+                  <div className="row" key={item.key}>
+                    <div className="h3">字体颜色</div>
+                    <div>
+                      <div
+                        style={styles.swatch}
+                        onClick={() => {
+                          this.setState({
+                            showColorPicker: true,
+                          });
+                        }}
+                      >
+                        <div style={styles.color} />
+                      </div>
+                      {this.state.showColorPicker ? (
+                        <div style={styles.popover}>
+                          <div
+                            style={styles.cover}
+                            onClick={() => {
+                              this.setState({
+                                showColorPicker: false,
+                              });
+                            }}
+                          />
+                          <SketchPicker
+                            color={item.value}
+                            onChange={this.changeTextsSetting.bind(this, i, item.key)}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="row" key={item.key}>
+                    <div className="h3">{item.name}</div>
+                    <Input
+                      value={item.value}
+                      defaultValue={item.value}
+                      onChange={this.changeTextsSetting.bind(this, i, item.key)}
                     />
                   </div>
-                ) : null}
-              </div>
-            </div>
-            <div className="row">
-              <div className="h3">左边距</div>
-              <Input
-                value={item.left}
-                defaultValue={item.left}
-                onChange={this.changeOptionArr.bind(this, i, 'left')}
-              />
-            </div>
-            <div className="row">
-              <div className="h3">上边距</div>
-              <Input
-                value={item.top}
-                defaultValue={item.top}
-                onChange={this.changeOptionArr.bind(this, i, 'top')}
-              />
-            </div>
+                );
+              }
+            })}
           </div>
         </div>
         <Modal
