@@ -1,5 +1,6 @@
 import React from 'react';
 import { fabric } from 'fabric';
+import _ from 'lodash';
 import { Upload, Button, Icon, Radio, Input, message, Modal, Spin } from 'antd';
 import SuperGif from 'libgif';
 import gifshot from 'gifshot';
@@ -13,9 +14,8 @@ class App extends React.Component {
     this.addFrames = this.addFrames.bind(this);
     this.reduceFrames = this.reduceFrames.bind(this);
     this.onChange = this.onChange.bind(this);
-    this.changeObjectText = this.changeObjectText.bind(this);
-    this.changeObjectFontSize = this.changeObjectFontSize.bind(this);
-    this.changeObjectColor = this.changeObjectColor.bind(this);
+    this.changeOptionArr = this.changeOptionArr.bind(this);
+    this.updateObject = this.updateObject.bind(this);
     this.previewEffect = this.previewEffect.bind(this);
     this.state = {
       clipPartNum: 3, //gif分的段数 默认3段
@@ -45,7 +45,11 @@ class App extends React.Component {
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
     //this.initData();
+    this.addEventListener();
+  }
+  addEventListener() {
     let that = this;
+    let throttlechangeActiveObjectValue = _.throttle(that.changeActiveObjectValue, 100);
     this.canvas_sprite.on('object:moving', function(e) {
       var obj = e.target;
       // if object is too big ignore
@@ -90,6 +94,52 @@ class App extends React.Component {
         optionArr: optionArrNew,
       });
     });
+
+    this.canvas_sprite.on('object:scaling', function(e) {
+      var obj = e.target;
+      // if object is too big ignore
+      if (obj.currentHeight > obj.canvas.height || obj.currentWidth > obj.canvas.width) {
+        return;
+      }
+      obj.setCoords();
+      // top-left  corner
+      if (obj.getBoundingRect().top < 0 || obj.getBoundingRect().left < 0) {
+        obj.top = Math.max(obj.top, obj.top - obj.getBoundingRect().top);
+        obj.left = Math.max(obj.left, obj.left - obj.getBoundingRect().left);
+      }
+      // bot-right corner
+      if (
+        obj.getBoundingRect().top + obj.getBoundingRect().height > obj.canvas.height ||
+        obj.getBoundingRect().left + obj.getBoundingRect().width > obj.canvas.width
+      ) {
+        obj.top = Math.min(
+          obj.top,
+          obj.canvas.height - obj.getBoundingRect().height + obj.top - obj.getBoundingRect().top,
+        );
+        obj.left = Math.min(
+          obj.left,
+          obj.canvas.width - obj.getBoundingRect().width + obj.left - obj.getBoundingRect().left,
+        );
+      }
+      throttlechangeActiveObjectValue();
+    });
+  }
+  changeActiveObjectValue() {
+    let activeObject = this.canvas_sprite.getActiveObject();
+    let index = activeObject.index;
+    let newOptionArr = _.clone(this.state.optionArr);
+    let arr = ['left', 'top', 'text', 'fontSize', 'fill'];
+    arr.forEach(item => {
+      newOptionArr[index][item] = activeObject[item];
+    });
+    this.setState(
+      {
+        optionArr: newOptionArr,
+      },
+      () => {
+        this.updateObject(index);
+      },
+    );
   }
   async pre_load_gif(gif_source) {
     // 判断是gif格式则交给this.pre_load_gif函数处理
@@ -150,24 +200,24 @@ class App extends React.Component {
   }
   initData() {
     let { clipPartNum } = this.state;
-
     this.clearCanvas();
     this.rects = new Array(clipPartNum).fill('');
     this.texts = new Array(clipPartNum).fill('');
     let optionArr = [];
     for (let index = 0; index < clipPartNum; index++) {
       optionArr.push({
-        name: `第${index + 1}段`,
-        frames: 2, //帧数
-        fontSize: '45',
+        fontSize: '40',
         text: `测试内容${index + 1}`,
-        fontColor: '#ff0000',
-        textWidth: 0,
-        textHeight: 0,
+        fill: '#ff0000',
         left: 0,
         top: 0,
+        name: `第${index + 1}段`,
+        frames: 2, //帧数
+
         imgWidth: '',
         imgHeight: '',
+        textWidth: 0,
+        textHeight: 0,
         textNumMax: 5, //最多文字数
         isAddText: 1, //是否添加文字
       });
@@ -180,11 +230,8 @@ class App extends React.Component {
         this.handlerClipPartNum();
       },
     );
-
-    console.log('optionArr', optionArr);
   }
   onChange = e => {
-    //console.log('radio checked', e.target.value);
     this.setState(
       {
         clipPartNum: e.target.value,
@@ -285,7 +332,7 @@ class App extends React.Component {
         top: 0, //距离画布上边的距离
         fontSize: item.fontSize, //文字大小
         lockRotation: true,
-        fill: item.fontColor,
+        fill: item.fill,
         index: i,
       });
       texts[i] = text;
@@ -356,29 +403,34 @@ class App extends React.Component {
       },
     );
   }
-  changeObjectText(i, e) {
-    let texts = this.texts;
-    texts[i].set({
-      text: e.target.value,
-    });
-    this.canvas_sprite.renderAll();
+  changeOptionArr(i, type, e) {
+    let newOptionArr = _.clone(this.state.optionArr);
+    newOptionArr[i][type] = e.target.value;
+    this.setState(
+      {
+        optionArr: newOptionArr,
+      },
+      () => {
+        this.updateObject(i);
+      },
+    );
   }
-  changeObjectFontSize(i, e) {
+  updateObject(i) {
     let texts = this.texts;
+    let optionArr = this.state.optionArr;
     texts[i].set({
-      fontSize: e.target.value / 1,
-      width: '',
-    });
-    this.canvas_sprite.renderAll();
-  }
-  changeObjectColor(i, e) {
-    let texts = this.texts;
-    texts[i].set({
-      fill: e.target.value,
+      ...optionArr[i],
+      fontSize: optionArr[i].fontSize / 1,
+      left: optionArr[i].left / 1,
+      top: optionArr[i].top / 1,
     });
     this.canvas_sprite.renderAll();
   }
   previewEffect(status) {
+    if (!this.framesLength) {
+      message.error(`请先添加gif图片`, 2);
+      return;
+    }
     this.setState({
       spinVisible: true,
       isPreviewEffect: status,
@@ -514,7 +566,7 @@ class App extends React.Component {
           <div>
             <Upload {...props}>
               <Button>
-                <Icon type="upload" /> Click to Upload
+                <Icon type="upload" /> 上传图片
               </Button>
             </Upload>
           </div>
@@ -527,7 +579,7 @@ class App extends React.Component {
           </div>
           <div className="input-timeinterval">
             <Input
-              addonBefore="每帧时间间隔"
+              addonBefore="帧间隔"
               placeholder={timeinterval}
               defaultValue={timeinterval}
               onBlur={event => {
@@ -581,52 +633,55 @@ class App extends React.Component {
                 <div className="row">
                   <div className="h3">文字内容</div>
                   <Input
-                    placeholder={item.text}
+                    value={item.text}
                     defaultValue={item.text}
-                    onChange={this.changeObjectText.bind(this, i)}
+                    onChange={this.changeOptionArr.bind(this, i, 'text')}
                   />
                 </div>
-                {/* <div className="row">
-                  <div className="h3">最大字数</div>
-                  <Input placeholder={item.textNumMax} defaultValue={item.textNumMax} />
-                </div>
-                <div className="row">
-                  <div className="h3">是否添加文字</div>
-                  <div className="radio-group">
-                    <Radio.Group onChange={this.handerChangeisAddText} value={item.isAddText}>
-                      <Radio value={1}>是</Radio>
-                      <Radio value={0}>否</Radio>
-                    </Radio.Group>
-                  </div>
-                </div> */}
                 <div className="row">
                   <div className="h3">字号</div>
                   <Input
-                    placeholder={item.fontSize}
+                    value={item.fontSize}
                     defaultValue={item.fontSize}
-                    onChange={this.changeObjectFontSize.bind(this, i)}
+                    onChange={this.changeOptionArr.bind(this, i, 'fontSize')}
                   />
                 </div>
                 <div className="row">
                   <div className="h3">字体颜色</div>
                   <Input
-                    placeholder={item.fontColor}
-                    defaultValue={item.fontColor}
-                    onChange={this.changeObjectColor.bind(this, i)}
+                    value={item.fill}
+                    defaultValue={item.fill}
+                    onChange={this.changeOptionArr.bind(this, i, 'fill')}
                   />
                 </div>
                 <div className="row">
+                  <div className="h3">左边距</div>
+                  <Input
+                    value={item.left}
+                    defaultValue={item.left}
+                    onChange={this.changeOptionArr.bind(this, i, 'left')}
+                  />
+                </div>
+                <div className="row">
+                  <div className="h3">上边距</div>
+                  <Input
+                    value={item.top}
+                    defaultValue={item.top}
+                    onChange={this.changeOptionArr.bind(this, i, 'top')}
+                  />
+                </div>
+                {/* <div className="row">
                   <div className="h3">起始坐标</div>
                   <div className="h4">
                     {item.left},{item.top}
                   </div>
-                </div>
-                <div className="row">
+                </div> */}
+                {/* <div className="row">
                   <div className="h3">结束坐标</div>
                   <div className="h4">
                     {item.left + item.textWidth},{item.top + item.textHeight}
                   </div>
-                </div>
+                </div> */}
               </div>
             );
           })}

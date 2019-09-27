@@ -1,10 +1,12 @@
 import React from 'react';
+import reactCSS from 'reactcss';
 import { fabric } from 'fabric';
+import _ from 'lodash';
 import { Button, Radio, Input, message, Modal, Spin } from 'antd';
+import { SketchPicker } from 'react-color';
 import utils from '@/utils/utils.js';
 import SuperGif from 'libgif';
 import gifshot from 'gifshot';
-//import axios from 'axios';
 import styles from '../index.scss';
 message.config({
   maxCount: 1,
@@ -14,27 +16,46 @@ class App extends React.Component {
     super(props);
     this.addFrames = this.addFrames.bind(this);
     this.reduceFrames = this.reduceFrames.bind(this);
-    this.onChange = this.onChange.bind(this);
-    this.changeObjectText = this.changeObjectText.bind(this);
-    this.changeObjectFontSize = this.changeObjectFontSize.bind(this);
-    this.changeObjectColor = this.changeObjectColor.bind(this);
+    this.changeOptionArr = this.changeOptionArr.bind(this);
+    this.updateObject = this.updateObject.bind(this);
+    this.changeActiveObjectValue = this.changeActiveObjectValue.bind(this);
     this.previewEffect = this.previewEffect.bind(this);
     this.state = {
       clipPartNum: 3, //gif分的段数 默认3段
-      optionArr: [], //初始化数据,initData
+      optionArr: [], //初始化数据,initOptionArrData
       previewGifVisible: false,
       spinVisible: false,
       timeinterval: 0.1, //最小支持0.02
-      gifUrl:
-        'https://5b0988e595225.cdn.sohucs.com/images/20190813/f181cb0e5906476e893019ec50cd6615.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
-      previewGifImgUrl: '',
+      gifUrl: 'http://127.0.0.1:5500/src/assets/201907112027212507.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
+      /* 'https://5b0988e595225.cdn.sohucs.com/images/20190813/f181cb0e5906476e893019ec50cd6615.gif' */ previewGifImgUrl:
+        '',
       isPreviewEffect: true, //true预览图片 false生成图片2种类型
+      displayColorPicker: [false, false, false, false],
+      settingAll: [
+        {
+          value: 40,
+          key: 'fontSize',
+          name: '字号',
+        },
+        {
+          fill: '#00000',
+          name: '文字颜色',
+        },
+        {
+          fill: 'left',
+          name: '左边距',
+        },
+        {
+          fill: '#top',
+          name: '上边距',
+        },
+      ],
     };
     this.bgColorArr = [
-      'rgba(0,0,0,0.3)',
-      'rgb(4, 250, 37, 0.3)',
-      'rgb(41, 4, 250, .3)',
-      'rgb(41, 4, 10, .3)',
+      'rgba(0,0,0,0.2)',
+      'rgb(4, 250, 37, 0.2)',
+      'rgb(41, 4, 250, .2)',
+      'rgb(41, 4, 10, .2)',
     ];
     this.canvas_sprite = ''; //渲图片的canvas对象
     this.rects = [];
@@ -49,8 +70,12 @@ class App extends React.Component {
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
     this.pre_load_gif(this.state.gifUrl);
-    //this.initData();
+    //this.initOptionArrData();
+    this.addEventListener();
+  }
+  addEventListener() {
     let that = this;
+    let throttlechangeActiveObjectValue = _.throttle(that.changeActiveObjectValue, 100);
     this.canvas_sprite.on('object:moving', function(e) {
       var obj = e.target;
       // if object is too big ignore
@@ -77,25 +102,227 @@ class App extends React.Component {
           obj.canvas.width - obj.getBoundingRect().width + obj.left - obj.getBoundingRect().left,
         );
       }
-      let { top, left, width, height } = e.target;
-      let { optionArr } = that.state;
-      let optionArrIndex = e.target.index;
-      let optionArrNew = JSON.parse(JSON.stringify(optionArr));
-      for (let index = 0; index < optionArrIndex; index++) {
-        left -= optionArrNew[index].frames * that.width;
-      }
-      optionArrNew[optionArrIndex] = {
-        ...optionArrNew[optionArrIndex],
-        textWidth: width,
-        textHeight: height,
-        left,
-        top,
-      };
-      that.setState({
-        optionArr: optionArrNew,
-      });
+      throttlechangeActiveObjectValue();
+    });
+
+    this.canvas_sprite.on('object:scaling', function(e) {
+      throttlechangeActiveObjectValue();
+    });
+    this.canvas_sprite.on('object:modified', function(e) {
+      throttlechangeActiveObjectValue();
     });
   }
+  changeActiveObjectValue() {
+    let activeObject = this.canvas_sprite.getActiveObject();
+    let index = activeObject.index;
+    let newOptionArr = _.clone(this.state.optionArr);
+    let arr = ['left', 'top', 'text', 'fontSize', 'fill', 'scaleY'];
+    let left = activeObject.left;
+    let optionArrIndex = activeObject.index;
+    arr.forEach(item => {
+      if (item === 'fontSize') {
+        newOptionArr[index][item] = activeObject[item] * activeObject.scaleY;
+      } else if (item === 'left') {
+        for (let index = 0; index < optionArrIndex; index++) {
+          left -= newOptionArr[index].frames * this.width;
+        }
+        newOptionArr[index][item] = left;
+      } else {
+        newOptionArr[index][item] = activeObject[item];
+      }
+    });
+    this.setState({
+      optionArr: newOptionArr,
+    });
+  }
+  initOptionArrData() {
+    let { clipPartNum } = this.state;
+    this.rects = new Array(clipPartNum).fill('');
+    this.texts = new Array(clipPartNum).fill('');
+    let optionArr = [];
+    for (let index = 0; index < clipPartNum; index++) {
+      optionArr.push({
+        fontSize: '40',
+        text: `测试内容${index + 1}`,
+        fill: '#333333',
+        left: 0,
+        top: 0,
+        name: `第${index + 1}段`,
+        frames: 2, //帧数
+        scaleY: 1,
+        imgWidth: '',
+        imgHeight: '',
+        textWidth: 0,
+        textHeight: 0,
+        textNumMax: 5, //最多文字数
+        isAddText: 1, //是否添加文字
+      });
+    }
+    this.setState(
+      {
+        optionArr: optionArr,
+      },
+      () => {
+        this.handlerClipPartNum();
+      },
+    );
+  }
+  //添加矩形 文字到各自的段数上
+  addObjectsToCanvas() {
+    const { optionArr } = this.state;
+    let rects = this.rects;
+    let texts = this.texts;
+    let canvas_sprite = this.canvas_sprite;
+    let left = 0;
+    optionArr.forEach((item, i) => {
+      let rect = new fabric.Rect({
+        left: left, //距离画布左侧的距离，单位是像素
+        top: 0, //距离画布上边的距离
+        fill: this.bgColorArr[i], //填充的颜色
+        width: item.frames * this.width, //方形的宽度
+        height: this.height, //方形的高度
+        selectable: false,
+      });
+      rects[i] = rect;
+      canvas_sprite.add(rect);
+      let text = new fabric.Textbox(item.text, {
+        left: left, //距离画布左侧的距离，单位是像素
+        top: 0, //距离画布上边的距离
+        fontSize: item.fontSize, //文字大小
+        //lockRotation: true,
+        fill: item.fill,
+        index: i,
+        editable: true,
+        scaleY: item.scaleY,
+        lockUniScaling: true, //只能等比缩放
+        borderColor: '#ff0000',
+        cornerColor: '#ff0000',
+      });
+      texts[i] = text;
+      canvas_sprite.add(text);
+      left += item.frames * this.width;
+    });
+    canvas_sprite.setActiveObject(texts[0]);
+  }
+  changeOptionArr(i, type, e) {
+    let newOptionArr = _.clone(this.state.optionArr);
+    if (type === 'fill') {
+      newOptionArr[i][type] = e.hex;
+    } else {
+      newOptionArr[i][type] = e.target.value;
+    }
+    this.setState(
+      {
+        optionArr: newOptionArr,
+      },
+      () => {
+        this.updateObject(i);
+      },
+    );
+  }
+  updateObject(i) {
+    let texts = this.texts;
+    let optionArr = this.state.optionArr;
+    let left = optionArr[i].left / 1;
+    optionArr.forEach((item, i2) => {
+      if (i2 < i) {
+        left += item.frames * this.width;
+      }
+    });
+    texts[i].set({
+      ...optionArr[i],
+      width: '',
+      fontSize: optionArr[i].fontSize / optionArr[i].scaleY,
+      left,
+      top: optionArr[i].top / 1,
+    });
+    this.canvas_sprite.renderAll();
+  }
+  //分配每段的帧数
+  handlerClipPartNum() {
+    let { clipPartNum, optionArr } = this.state;
+    let length = this.framesLength;
+    let residue = length % clipPartNum;
+    let average = (length - residue) / clipPartNum; //整除值
+    let optionArrNew = JSON.parse(JSON.stringify(optionArr));
+    for (let index = 0; index < clipPartNum; index++) {
+      if (index === 1) {
+        optionArrNew[index].frames = average + residue;
+      } else {
+        optionArrNew[index].frames = average;
+      }
+    }
+    this.setState(
+      {
+        optionArr: optionArrNew,
+      },
+      () => {
+        this.addObjectsToCanvas();
+        this.setState({
+          spinVisible: false,
+        });
+      },
+    ); //分配完帧数,渲染矩形分割区和文字
+  }
+  //清空画布
+  clearCanvas() {
+    let canvas_sprite = this.canvas_sprite;
+    let Objects = canvas_sprite.getObjects();
+    Objects.forEach(element => {
+      canvas_sprite.remove(element);
+    });
+  }
+  addFrames(i) {
+    let { clipPartNum, optionArr } = this.state;
+    let optionArrNew = JSON.parse(JSON.stringify(optionArr));
+    if (i === clipPartNum - 1) {
+      if (optionArrNew[0].frames === 1) {
+        message.warning('不能再加了已经最大了');
+        return;
+      }
+      optionArrNew[0].frames--;
+    } else {
+      if (optionArrNew[i + 1].frames === 1) {
+        message.warning('不能再加了已经最大了');
+        return;
+      }
+      optionArrNew[i + 1].frames--;
+    }
+    optionArrNew[i].frames++;
+    this.clearCanvas();
+    this.setState(
+      {
+        optionArr: optionArrNew,
+      },
+      () => {
+        this.addObjectsToCanvas();
+      },
+    );
+  }
+  reduceFrames(i) {
+    let { clipPartNum, optionArr } = this.state;
+    let optionArrNew = JSON.parse(JSON.stringify(optionArr));
+    if (optionArrNew[i].frames === 1) {
+      message.warning('不能再减了已经最小了');
+      return;
+    }
+    optionArrNew[i].frames--;
+    if (i === clipPartNum - 1) {
+      optionArrNew[0].frames++;
+    } else {
+      optionArrNew[i + 1].frames++;
+    }
+    this.clearCanvas();
+    this.setState(
+      {
+        optionArr: optionArrNew,
+      },
+      () => {
+        this.addObjectsToCanvas();
+      },
+    );
+  }
+  //加载图片
   async pre_load_gif(gif_source) {
     if (!utils.IsURL(gif_source)) {
       message.error(`链接地址错误,请仔细检查`, 2);
@@ -136,7 +363,7 @@ class App extends React.Component {
           });
         }
         this.img_list = img_list;
-        this.initData();
+        this.initOptionArrData();
         this.buildView();
       });
     } catch (error) {
@@ -146,62 +373,6 @@ class App extends React.Component {
       });
     }
   }
-  convertCanvasToImage(canvas, filename) {
-    return this.dataURLtoFile(canvas.toDataURL('image/png'), filename);
-  }
-  dataURLtoFile(dataurl, filename) {
-    const arr = dataurl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    var n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
-  }
-  initData() {
-    let { clipPartNum } = this.state;
-    this.clearCanvas();
-    this.rects = new Array(clipPartNum).fill('');
-    this.texts = new Array(clipPartNum).fill('');
-    let optionArr = [];
-    for (let index = 0; index < clipPartNum; index++) {
-      optionArr.push({
-        name: `第${index + 1}段`,
-        frames: 2, //帧数
-        fontSize: '45',
-        text: `测试内容${index + 1}`,
-        fontColor: '#ff0000',
-        textWidth: 0,
-        textHeight: 0,
-        left: 0,
-        top: 0,
-        imgWidth: '',
-        imgHeight: '',
-        textNumMax: 5, //最多文字数
-        isAddText: 1, //是否添加文字
-      });
-    }
-    this.setState(
-      {
-        optionArr: optionArr,
-      },
-      () => {
-        this.handlerClipPartNum();
-      },
-    );
-  }
-  onChange = e => {
-    this.setState(
-      {
-        clipPartNum: e.target.value,
-      },
-      () => {
-        this.initData();
-      },
-    );
-  };
   buildView() {
     let canvas_sprite = this.canvas_sprite;
     let that = this;
@@ -242,151 +413,26 @@ class App extends React.Component {
       });
     });
   }
-  //分配每段的帧数
-  handlerClipPartNum() {
-    let { clipPartNum, optionArr } = this.state;
-    let length = this.framesLength;
-    let residue = length % clipPartNum;
-    let average = (length - residue) / clipPartNum; //整除值
-    let optionArrNew = JSON.parse(JSON.stringify(optionArr));
-    for (let index = 0; index < clipPartNum; index++) {
-      if (index === 1) {
-        optionArrNew[index].frames = average + residue;
-      } else {
-        optionArrNew[index].frames = average;
-      }
+  convertCanvasToImage(canvas, filename) {
+    return this.dataURLtoFile(canvas.toDataURL('image/png'), filename);
+  }
+  dataURLtoFile(dataurl, filename) {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    var n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
     }
-    this.setState(
-      {
-        optionArr: optionArrNew,
-      },
-      () => {
-        this.renderFramesInit();
-        this.setState({
-          spinVisible: false,
-        });
-      },
-    ); //分配完帧数,渲染矩形分割区和文字
+    return new File([u8arr], filename, { type: mime });
   }
-  //增加矩形 文字到各自的段数上
-  renderFramesInit() {
-    const { optionArr } = this.state;
-    let rects = this.rects;
-    let texts = this.texts;
-    let canvas_sprite = this.canvas_sprite;
-    let left = 0;
-    optionArr.forEach((item, i) => {
-      let rect = new fabric.Rect({
-        left: left, //距离画布左侧的距离，单位是像素
-        top: 0, //距离画布上边的距离
-        fill: this.bgColorArr[i], //填充的颜色
-        width: item.frames * this.width, //方形的宽度
-        height: this.height, //方形的高度
-        selectable: false,
-      });
-      rects[i] = rect;
-      canvas_sprite.add(rect);
-
-      let text = new fabric.Textbox(item.text, {
-        left: left, //距离画布左侧的距离，单位是像素
-        top: 0, //距离画布上边的距离
-        fontSize: item.fontSize, //文字大小
-        //lockRotation: true,
-        fill: item.fontColor,
-        index: i,
-        editable: true,
-      });
-      texts[i] = text;
-      canvas_sprite.add(text);
-      left += item.frames * this.width;
-    });
-  }
-  clearCanvas() {
-    let canvas_sprite = this.canvas_sprite;
-    this.rects.forEach(function(item, i) {
-      if (item) {
-        canvas_sprite.remove(item);
-      }
-    });
-    this.texts.forEach(function(item, i) {
-      if (item) {
-        canvas_sprite.remove(item);
-      }
-    });
-  }
-  addFrames(i) {
-    let { clipPartNum, optionArr } = this.state;
-    let optionArrNew = JSON.parse(JSON.stringify(optionArr));
-    if (i === clipPartNum - 1) {
-      if (optionArrNew[0].frames === 1) {
-        message.warning('不能再加了已经最大了');
-        return;
-      }
-      optionArrNew[0].frames--;
-    } else {
-      if (optionArrNew[i + 1].frames === 1) {
-        message.warning('不能再加了已经最大了');
-        return;
-      }
-      optionArrNew[i + 1].frames--;
-    }
-    optionArrNew[i].frames++;
-    this.clearCanvas();
-    this.setState(
-      {
-        optionArr: optionArrNew,
-      },
-      () => {
-        this.renderFramesInit();
-      },
-    );
-  }
-  reduceFrames(i) {
-    let { clipPartNum, optionArr } = this.state;
-    let optionArrNew = JSON.parse(JSON.stringify(optionArr));
-    if (optionArrNew[i].frames === 1) {
-      message.warning('不能再减了已经最小了');
+  //预览图片
+  previewEffect(status) {
+    if (!this.framesLength) {
+      message.error(`请先添加gif图片`, 2);
       return;
     }
-    optionArrNew[i].frames--;
-    if (i === clipPartNum - 1) {
-      optionArrNew[0].frames++;
-    } else {
-      optionArrNew[i + 1].frames++;
-    }
-    this.clearCanvas();
-    this.setState(
-      {
-        optionArr: optionArrNew,
-      },
-      () => {
-        this.renderFramesInit();
-      },
-    );
-  }
-  changeObjectText(i, e) {
-    let texts = this.texts;
-    texts[i].set({
-      text: e.target.value,
-    });
-    this.canvas_sprite.renderAll();
-  }
-  changeObjectFontSize(i, e) {
-    let texts = this.texts;
-    texts[i].set({
-      fontSize: e.target.value / 1,
-      width: '',
-    });
-    this.canvas_sprite.renderAll();
-  }
-  changeObjectColor(i, e) {
-    let texts = this.texts;
-    texts[i].set({
-      fill: e.target.value,
-    });
-    this.canvas_sprite.renderAll();
-  }
-  previewEffect(status) {
     this.setState({
       spinVisible: true,
       isPreviewEffect: status,
@@ -506,6 +552,7 @@ class App extends React.Component {
       spinVisible,
       previewGifImgUrl,
       isPreviewEffect,
+      displayColorPicker,
     } = this.state;
     return (
       <div id="main">
@@ -539,7 +586,19 @@ class App extends React.Component {
             </Button>
           </div>
           <div>
-            <Radio.Group onChange={this.onChange} value={this.state.clipPartNum}>
+            <Radio.Group
+              onChange={e => {
+                this.setState(
+                  {
+                    clipPartNum: e.target.value,
+                  },
+                  () => {
+                    this.pre_load_gif(this.state.gifUrl);
+                  },
+                );
+              }}
+              value={this.state.clipPartNum}
+            >
               <Radio value={2}>二段</Radio>
               <Radio value={3}>三段</Radio>
               <Radio value={4}>四段</Radio>
@@ -547,7 +606,7 @@ class App extends React.Component {
           </div>
           <div className="input-timeinterval">
             <Input
-              addonBefore="每帧时间间隔"
+              addonBefore="帧间隔"
               placeholder={timeinterval}
               defaultValue={timeinterval}
               onBlur={event => {
@@ -575,6 +634,35 @@ class App extends React.Component {
         </div>
         <div className="option">
           {optionArr.map((item, i) => {
+            const styles = reactCSS({
+              default: {
+                color: {
+                  width: '36px',
+                  height: '14px',
+                  borderRadius: '2px',
+                  background: `${item.fill}`,
+                },
+                swatch: {
+                  padding: '5px',
+                  background: '#fff',
+                  borderRadius: '1px',
+                  boxShadow: '0 0 0 1px rgba(0,0,0,.1)',
+                  display: 'inline-block',
+                  cursor: 'pointer',
+                },
+                popover: {
+                  position: 'absolute',
+                  zIndex: '2',
+                },
+                cover: {
+                  position: 'fixed',
+                  top: '0px',
+                  right: '0px',
+                  bottom: '0px',
+                  left: '0px',
+                },
+              },
+            });
             return (
               <div key={i} className="option-li">
                 <div className="row">
@@ -601,55 +689,150 @@ class App extends React.Component {
                 <div className="row">
                   <div className="h3">文字内容</div>
                   <Input
-                    placeholder={item.text}
+                    value={item.text}
                     defaultValue={item.text}
-                    onChange={this.changeObjectText.bind(this, i)}
+                    onChange={this.changeOptionArr.bind(this, i, 'text')}
                   />
                 </div>
-                {/* <div className="row">
-                  <div className="h3">最大字数</div>
-                  <Input placeholder={item.textNumMax} defaultValue={item.textNumMax} />
-                </div>
-                <div className="row">
-                  <div className="h3">是否添加文字</div>
-                  <div className="radio-group">
-                    <Radio.Group onChange={this.handerChangeisAddText} value={item.isAddText}>
-                      <Radio value={1}>是</Radio>
-                      <Radio value={0}>否</Radio>
-                    </Radio.Group>
-                  </div>
-                </div> */}
                 <div className="row">
                   <div className="h3">字号</div>
                   <Input
-                    placeholder={item.fontSize}
+                    value={item.fontSize}
                     defaultValue={item.fontSize}
-                    onChange={this.changeObjectFontSize.bind(this, i)}
+                    onChange={this.changeOptionArr.bind(this, i, 'fontSize')}
                   />
                 </div>
                 <div className="row">
                   <div className="h3">字体颜色</div>
+                  <div>
+                    <div
+                      style={styles.swatch}
+                      onClick={() => {
+                        let displayColorPickerNew = _.cloneDeep(displayColorPicker);
+                        displayColorPickerNew[i] = true;
+                        this.setState({
+                          displayColorPicker: displayColorPickerNew,
+                        });
+                      }}
+                    >
+                      <div style={styles.color} />
+                    </div>
+                    {displayColorPicker[i] ? (
+                      <div style={styles.popover}>
+                        <div
+                          style={styles.cover}
+                          onClick={() => {
+                            this.setState({
+                              displayColorPicker: [false, false, false, false],
+                            });
+                          }}
+                        />
+                        <SketchPicker
+                          color={item.fill}
+                          onChange={this.changeOptionArr.bind(this, i, 'fill')}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="h3">左边距</div>
                   <Input
-                    placeholder={item.fontColor}
-                    defaultValue={item.fontColor}
-                    onChange={this.changeObjectColor.bind(this, i)}
+                    value={item.left}
+                    defaultValue={item.left}
+                    onChange={this.changeOptionArr.bind(this, i, 'left')}
                   />
                 </div>
                 <div className="row">
+                  <div className="h3">上边距</div>
+                  <Input
+                    value={item.top}
+                    defaultValue={item.top}
+                    onChange={this.changeOptionArr.bind(this, i, 'top')}
+                  />
+                </div>
+                {/* <div className="row">
                   <div className="h3">起始坐标</div>
                   <div className="h4">
                     {item.left},{item.top}
                   </div>
-                </div>
-                <div className="row">
+                </div> */}
+                {/* <div className="row">
                   <div className="h3">结束坐标</div>
                   <div className="h4">
                     {item.left + item.textWidth},{item.top + item.textHeight}
                   </div>
-                </div>
+                </div> */}
               </div>
             );
           })}
+          <div className="option-li">
+            <div className="row">
+              <div className="h3">操作所有文字</div>
+            </div>
+            {this.state.settingAll.map(item => {
+              return (
+                <div className="row">
+                  <div className="h3">字号</div>
+                  <Input
+                    value={item.fontSize}
+                    defaultValue={item.fontSize}
+                    onChange={this.changeOptionArr.bind(this, i, 'fontSize')}
+                  />
+                </div>
+              );
+            })}
+
+            <div className="row">
+              <div className="h3">字体颜色</div>
+              <div>
+                <div
+                  style={styles.swatch}
+                  onClick={() => {
+                    let displayColorPickerNew = _.cloneDeep(displayColorPicker);
+                    displayColorPickerNew[i] = true;
+                    this.setState({
+                      displayColorPicker: displayColorPickerNew,
+                    });
+                  }}
+                >
+                  <div style={styles.color} />
+                </div>
+                {displayColorPicker[i] ? (
+                  <div style={styles.popover}>
+                    <div
+                      style={styles.cover}
+                      onClick={() => {
+                        this.setState({
+                          displayColorPicker: [false, false, false, false],
+                        });
+                      }}
+                    />
+                    <SketchPicker
+                      color={item.fill}
+                      onChange={this.changeOptionArr.bind(this, i, 'fill')}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="row">
+              <div className="h3">左边距</div>
+              <Input
+                value={item.left}
+                defaultValue={item.left}
+                onChange={this.changeOptionArr.bind(this, i, 'left')}
+              />
+            </div>
+            <div className="row">
+              <div className="h3">上边距</div>
+              <Input
+                value={item.top}
+                defaultValue={item.top}
+                onChange={this.changeOptionArr.bind(this, i, 'top')}
+              />
+            </div>
+          </div>
         </div>
         <Modal
           title="效果"
