@@ -27,14 +27,14 @@ class App extends React.Component {
       previewGifVisible: false,
       spinVisible: false,
       timeinterval: 0.1, //最小支持0.02
-      gifUrl: 'http://127.0.0.1:5500/src/assets/201907112027212507.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
-      /* 'https://5b0988e595225.cdn.sohucs.com/images/20190813/f181cb0e5906476e893019ec50cd6615.gif' */ previewGifImgUrl:
-        '',
+      gifUrl:
+        'https://5b0988e595225.cdn.sohucs.com/images/20190813/f181cb0e5906476e893019ec50cd6615.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
+      previewGifImgUrl: '',
       isPreviewEffect: true, //true预览图片 false生成图片2种类型
       displayColorPicker: [false, false, false, false],
       textsSetting: [
         {
-          value: '再爱我一次',
+          value: '统一替换',
           key: 'text',
           name: '文字内容',
         },
@@ -153,7 +153,7 @@ class App extends React.Component {
     for (let index = 0; index < clipPartNum; index++) {
       optionArr.push({
         fontSize: '40',
-        text: `测试内容${index + 1}`,
+        text: `第${index + 1}条文字内容`,
         fill: '#333333',
         left: 0,
         top: 0,
@@ -304,9 +304,19 @@ class App extends React.Component {
   //清空画布
   clearCanvas() {
     let canvas_sprite = this.canvas_sprite;
-    let Objects = canvas_sprite.getObjects();
+    /* let Objects = canvas_sprite.getObjects();
     Objects.forEach(element => {
       canvas_sprite.remove(element);
+    }); */
+    this.rects.forEach(function(item, i) {
+      if (item) {
+        canvas_sprite.remove(item);
+      }
+    });
+    this.texts.forEach(function(item, i) {
+      if (item) {
+        canvas_sprite.remove(item);
+      }
     });
   }
   addFrames(i) {
@@ -529,8 +539,8 @@ class App extends React.Component {
     img.left = 0;
     img.top = 0;
     let optionArr = this.state.optionArr;
-    text.left = optionArr[textIndex].left;
-    text.top = optionArr[textIndex].top;
+    text.left = optionArr[textIndex].left / 1;
+    text.top = optionArr[textIndex].top / 1;
     let that = this;
     clearTimeout(this.t);
     return new Promise(res => {
@@ -616,7 +626,7 @@ class App extends React.Component {
             <Button
               type="primary"
               onClick={() => {
-                this.pre_load_gif(gifUrl);
+                this.initOptionArrData();
               }}
             >
               添加图片
@@ -625,12 +635,13 @@ class App extends React.Component {
           <div>
             <Radio.Group
               onChange={e => {
+                this.clearCanvas();
                 this.setState(
                   {
                     clipPartNum: e.target.value,
                   },
                   () => {
-                    this.pre_load_gif(this.state.gifUrl);
+                    this.initOptionArrData();
                   },
                 );
               }}
@@ -658,11 +669,6 @@ class App extends React.Component {
               }}
             />
           </div>
-          <div className="btn">
-            <Button type="primary" onClick={this.previewEffect.bind(this, true)}>
-              预览效果
-            </Button>
-          </div>
           <div className="input-timeinterval">
             <Input
               addonBefore="图片大小"
@@ -674,6 +680,11 @@ class App extends React.Component {
                 });
               }}
             />
+          </div>
+          <div className="btn">
+            <Button type="primary" onClick={this.previewEffect.bind(this, true)}>
+              预览效果
+            </Button>
           </div>
           <div className="btn">
             <Button type="primary" onClick={this.previewEffect.bind(this, false)}>
@@ -815,88 +826,90 @@ class App extends React.Component {
               </div>
             );
           })}
-          <div className="option-li">
-            <div className="row">
-              <h3>修改全部文字状态</h3>
-            </div>
-            {this.state.textsSetting.map((item, i) => {
-              if (item.key === 'fill') {
-                const styles = reactCSS({
-                  default: {
-                    color: {
-                      width: '36px',
-                      height: '14px',
-                      borderRadius: '2px',
-                      background: `${item.value}`,
+          {!!optionArr.length && (
+            <div className="option-li">
+              <div className="row">
+                <h3>文字属性统一编辑</h3>
+              </div>
+              {this.state.textsSetting.map((item, i) => {
+                if (item.key === 'fill') {
+                  const styles = reactCSS({
+                    default: {
+                      color: {
+                        width: '36px',
+                        height: '14px',
+                        borderRadius: '2px',
+                        background: `${item.value}`,
+                      },
+                      swatch: {
+                        padding: '5px',
+                        background: '#fff',
+                        borderRadius: '1px',
+                        boxShadow: '0 0 0 1px rgba(0,0,0,.1)',
+                        display: 'inline-block',
+                        cursor: 'pointer',
+                      },
+                      popover: {
+                        position: 'absolute',
+                        zIndex: '2',
+                      },
+                      cover: {
+                        position: 'fixed',
+                        top: '0px',
+                        right: '0px',
+                        bottom: '0px',
+                        left: '0px',
+                      },
                     },
-                    swatch: {
-                      padding: '5px',
-                      background: '#fff',
-                      borderRadius: '1px',
-                      boxShadow: '0 0 0 1px rgba(0,0,0,.1)',
-                      display: 'inline-block',
-                      cursor: 'pointer',
-                    },
-                    popover: {
-                      position: 'absolute',
-                      zIndex: '2',
-                    },
-                    cover: {
-                      position: 'fixed',
-                      top: '0px',
-                      right: '0px',
-                      bottom: '0px',
-                      left: '0px',
-                    },
-                  },
-                });
-                return (
-                  <div className="row" key={item.key}>
-                    <div className="h3">字体颜色</div>
-                    <div>
-                      <div
-                        style={styles.swatch}
-                        onClick={() => {
-                          this.setState({
-                            showColorPicker: true,
-                          });
-                        }}
-                      >
-                        <div style={styles.color} />
-                      </div>
-                      {this.state.showColorPicker ? (
-                        <div style={styles.popover}>
-                          <div
-                            style={styles.cover}
-                            onClick={() => {
-                              this.setState({
-                                showColorPicker: false,
-                              });
-                            }}
-                          />
-                          <SketchPicker
-                            color={item.value}
-                            onChange={this.changeTextsSetting.bind(this, i, item.key)}
-                          />
+                  });
+                  return (
+                    <div className="row" key={item.key}>
+                      <div className="h3">字体颜色</div>
+                      <div>
+                        <div
+                          style={styles.swatch}
+                          onClick={() => {
+                            this.setState({
+                              showColorPicker: true,
+                            });
+                          }}
+                        >
+                          <div style={styles.color} />
                         </div>
-                      ) : null}
+                        {this.state.showColorPicker ? (
+                          <div style={styles.popover}>
+                            <div
+                              style={styles.cover}
+                              onClick={() => {
+                                this.setState({
+                                  showColorPicker: false,
+                                });
+                              }}
+                            />
+                            <SketchPicker
+                              color={item.value}
+                              onChange={this.changeTextsSetting.bind(this, i, item.key)}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                );
-              } else {
-                return (
-                  <div className="row" key={item.key}>
-                    <div className="h3">{item.name}</div>
-                    <Input
-                      value={item.value}
-                      defaultValue={item.value}
-                      onChange={this.changeTextsSetting.bind(this, i, item.key)}
-                    />
-                  </div>
-                );
-              }
-            })}
-          </div>
+                  );
+                } else {
+                  return (
+                    <div className="row" key={item.key}>
+                      <div className="h3">{item.name}</div>
+                      <Input
+                        value={item.value}
+                        defaultValue={item.value}
+                        onChange={this.changeTextsSetting.bind(this, i, item.key)}
+                      />
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          )}
         </div>
         <Modal
           title="效果"
