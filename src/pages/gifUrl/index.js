@@ -59,6 +59,7 @@ class App extends React.Component {
           name: '上边距',
         },
       ],
+      imgWidth: 300,
     };
     this.bgColorArr = [
       'rgba(0,0,0,0.2)',
@@ -250,9 +251,9 @@ class App extends React.Component {
         textsSetting: newTextsSetting,
       },
       () => {
-        this.state.optionArr.forEach((item, i)=>{
+        this.state.optionArr.forEach((item, i) => {
           this.updateObject(i);
-        })
+        });
       },
     );
   }
@@ -557,9 +558,9 @@ class App extends React.Component {
     gifshot.createGIF(
       {
         images: this.toDataURL,
-        gifWidth: this.width,
+        gifWidth: this.state.imgWidth,
         // Desired height of the image
-        gifHeight: this.height,
+        gifHeight: (this.state.imgWidth / this.width) * this.height,
         interval: this.state.timeinterval / 1,
         //frameDuration: this.state.timeinterval / 1,
       },
@@ -661,6 +662,18 @@ class App extends React.Component {
             <Button type="primary" onClick={this.previewEffect.bind(this, true)}>
               预览效果
             </Button>
+          </div>
+          <div className="input-timeinterval">
+            <Input
+              addonBefore="图片大小"
+              placeholder={this.state.imgWidth}
+              defaultValue={this.state.imgWidth}
+              onChange={event => {
+                this.setState({
+                  imgWidth: event.target.value,
+                });
+              }}
+            />
           </div>
           <div className="btn">
             <Button type="primary" onClick={this.previewEffect.bind(this, false)}>
@@ -904,7 +917,10 @@ class App extends React.Component {
                 id="previewGifImg"
                 src={previewGifImgUrl}
                 alt=""
-                style={{ width: this.width, height: this.height }}
+                style={{
+                  width: this.state.imgWidth / 1,
+                  height: (this.state.imgWidth / this.width) * this.height,
+                }}
               />
               <div className="btn-createGIF">
                 <a href={previewGifImgUrl} download={previewGifImgUrl}>
