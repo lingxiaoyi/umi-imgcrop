@@ -2,7 +2,7 @@ import React from 'react';
 import reactCSS from 'reactcss';
 import { fabric } from 'fabric';
 import _ from 'lodash';
-import { Button, Radio, Input, message, Modal, Spin } from 'antd';
+import { Upload, Icon, Button, Radio, Input, message, Modal, Spin } from 'antd';
 import { SketchPicker } from 'react-color';
 import utils from '@/utils/utils.js';
 import SuperGif from 'libgif';
@@ -474,6 +474,49 @@ class App extends React.Component {
     }
     return new File([u8arr], filename, { type: mime });
   }
+  async pre_load_gif_from_upload(gif_source) {
+    // 判断是gif格式则交给this.pre_load_gif函数处理
+    if (!/(image\/gif)/.test(gif_source.type)) {
+      message.error(`请上传gif格式的图片`, 2);
+      return;
+    }
+    try {
+      this.setState({
+        spinVisible: true,
+      });
+      const gifImg = document.createElement('img');
+      // gif库需要img标签配置下面两个属性
+      gifImg.setAttribute('rel:animated_src', URL.createObjectURL(gif_source));
+      gifImg.setAttribute('rel:auto_play', '0');
+      const div = document.createElement('div');
+      div.appendChild(gifImg); //防止报错
+      // 新建gif实例
+
+      var rub = new SuperGif({ gif: gifImg });
+      rub.load(() => {
+        var img_list = [];
+        for (let i = 1; i <= rub.get_length(); i++) {
+          // 遍历gif实例的每一帧
+          rub.move_to(i);
+          // 将每一帧的canvas转换成file对象
+          let cur_file = this.convertCanvasToImage(rub.get_canvas(), `gif-${i}`);
+          img_list.push({
+            file_name: cur_file.name,
+            url: URL.createObjectURL(cur_file),
+            file: cur_file,
+          });
+        }
+        this.img_list = img_list;
+        this.initOptionArrData();
+        this.buildView();
+      });
+    } catch (error) {
+      message.error(`出错了${error}`, 2);
+      this.setState({
+        spinVisible: false,
+      });
+    }
+  }
   //预览图片
   previewEffect(status) {
     if (!this.framesLength) {
@@ -591,6 +634,12 @@ class App extends React.Component {
     );
   }
   render() {
+    let that = this;
+    const props = {
+      beforeUpload(file) {
+        that.pre_load_gif_from_upload(file);
+      },
+    };
     const {
       optionArr,
       previewGifVisible,
@@ -605,6 +654,13 @@ class App extends React.Component {
       <div id="main">
         <canvas id="merge" width="2000" height="300" />
         <div className="box">
+          <div>
+            <Upload {...props}>
+              <Button>
+                <Icon type="upload" /> 上传图片
+              </Button>
+            </Upload>
+          </div>
           <div className={styles['url-input']}>
             <Input
               addonBefore="图片url"
@@ -622,7 +678,7 @@ class App extends React.Component {
               }}
             />
           </div>
-          <div className="btn">
+          {/* <div className="btn">
             <Button
               type="primary"
               onClick={() => {
@@ -631,7 +687,7 @@ class App extends React.Component {
             >
               添加图片
             </Button>
-          </div>
+          </div> */}
           <div>
             <Radio.Group
               onChange={e => {

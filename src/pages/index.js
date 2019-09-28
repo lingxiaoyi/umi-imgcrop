@@ -2,8 +2,9 @@ import React from 'react';
 import reactCSS from 'reactcss';
 import { fabric } from 'fabric';
 import _ from 'lodash';
-import { Upload, Button, Icon, Radio, Input, message, Modal, Spin } from 'antd';
+import { Upload, Icon, Button, Radio, Input, message, Modal, Spin } from 'antd';
 import { SketchPicker } from 'react-color';
+import utils from '@/utils/utils.js';
 import SuperGif from 'libgif';
 import gifshot from 'gifshot';
 import styles from './index.scss';
@@ -22,10 +23,12 @@ class App extends React.Component {
     this.previewEffect = this.previewEffect.bind(this);
     this.state = {
       clipPartNum: 3, //gif分的段数 默认3段
-      optionArr: [], //初始化数据,initData
+      optionArr: [], //初始化数据,initOptionArrData
       previewGifVisible: false,
       spinVisible: false,
       timeinterval: 0.1, //最小支持0.02
+      gifUrl:
+        'https://5b0988e595225.cdn.sohucs.com/images/20190813/f181cb0e5906476e893019ec50cd6615.gif', //备用地址2 https://static001.geekbang.org/resource/image/28/70/28959e4de450ba38b84fd11c5b058570.gif
       previewGifImgUrl: '',
       isPreviewEffect: true, //true预览图片 false生成图片2种类型
       displayColorPicker: [false, false, false, false],
@@ -59,10 +62,10 @@ class App extends React.Component {
       imgWidth: 300,
     };
     this.bgColorArr = [
-      'rgba(0,0,0,0.3)',
-      'rgb(4, 250, 37, 0.3)',
-      'rgb(41, 4, 250, .3)',
-      'rgb(41, 4, 10, .3)',
+      'rgba(0,0,0,0.2)',
+      'rgb(4, 250, 37, 0.2)',
+      'rgb(41, 4, 250, .2)',
+      'rgb(41, 4, 10, .2)',
     ];
     this.canvas_sprite = ''; //渲图片的canvas对象
     this.rects = [];
@@ -76,7 +79,8 @@ class App extends React.Component {
 
   componentDidMount() {
     this.canvas_sprite = new fabric.Canvas('merge');
-    //this.initData();
+    this.pre_load_gif(this.state.gifUrl);
+    //this.initOptionArrData();
     this.addEventListener();
   }
   addEventListener() {
@@ -365,7 +369,112 @@ class App extends React.Component {
       },
     );
   }
+  //加载图片
   async pre_load_gif(gif_source) {
+    if (!utils.IsURL(gif_source)) {
+      message.error(`链接地址错误,请仔细检查`, 2);
+      return;
+    }
+    if (gif_source.indexOf('.gif') === -1) {
+      message.error(`请输入gif图片地址`, 2);
+      return;
+    }
+    let res = await utils.CheckImgExists(gif_source);
+    if (!res) {
+      message.error(`图片加载失败,请输入正确的图片链接地址`, 2);
+      return;
+    }
+    try {
+      this.setState({
+        spinVisible: true,
+      });
+      const gifImg = document.createElement('img');
+      // gif库需要img标签配置下面两个属性
+      gifImg.setAttribute('rel:animated_src', gif_source);
+      gifImg.setAttribute('rel:auto_play', '0');
+      const div = document.createElement('div');
+      div.appendChild(gifImg); //防止报错
+      // 新建gif实例
+      var rub = new SuperGif({ gif: gifImg });
+      rub.load(() => {
+        var img_list = [];
+        for (let i = 1; i <= rub.get_length(); i++) {
+          // 遍历gif实例的每一帧
+          rub.move_to(i);
+          // 将每一帧的canvas转换成file对象
+          let cur_file = this.convertCanvasToImage(rub.get_canvas(), `gif-${i}`);
+          img_list.push({
+            file_name: cur_file.name,
+            url: URL.createObjectURL(cur_file),
+            file: cur_file,
+          });
+        }
+        this.img_list = img_list;
+        this.initOptionArrData();
+        this.buildView();
+      });
+    } catch (error) {
+      message.error(`出错了${error}`, 2);
+      this.setState({
+        spinVisible: false,
+      });
+    }
+  }
+  buildView() {
+    let canvas_sprite = this.canvas_sprite;
+    let that = this;
+    that.imgs = [];
+    canvas_sprite.clear();
+    this.img_list.forEach(function(frame, i) {
+      new fabric.Image.fromURL(frame.url, function(img) {
+        let width = 300;
+        let scale = width / img.width;
+        let height = img.height * scale;
+        that.width = width;
+        that.height = height;
+        img.set({
+          selectable: false,
+          fill: 'rgba(0,0,0,0)',
+          width: img.width,
+          height: img.height,
+          scaleX: scale,
+          scaleY: scale,
+          originX: 'left',
+          originY: 'top',
+        });
+        img.left = img.width * scale * i;
+        canvas_sprite.setHeight(height);
+        canvas_sprite.setWidth(width * (i + 1));
+        canvas_sprite.add(img);
+        that.imgs.push(img);
+        //加线进来
+        let Line = new fabric.Line([width * i, 0, width * i, height], {
+          selectable: false,
+          fill: '#000000',
+          stroke: 'rgba(0,0,0,0.8)', //笔触颜色
+        });
+        canvas_sprite.add(Line);
+        canvas_sprite.renderAll();
+        that.framesLength = that.img_list.length; //图片总帧数
+        if (i === that.img_list.length - 1) that.handlerClipPartNum(); //加载为异步,必须在图片加载完成
+      });
+    });
+  }
+  convertCanvasToImage(canvas, filename) {
+    return this.dataURLtoFile(canvas.toDataURL('image/png'), filename);
+  }
+  dataURLtoFile(dataurl, filename) {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    var n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
+  }
+  async pre_load_gif_from_upload(gif_source) {
     // 判断是gif格式则交给this.pre_load_gif函数处理
     if (!/(image\/gif)/.test(gif_source.type)) {
       message.error(`请上传gif格式的图片`, 2);
@@ -407,60 +516,6 @@ class App extends React.Component {
         spinVisible: false,
       });
     }
-  }
-  convertCanvasToImage(canvas, filename) {
-    return this.dataURLtoFile(canvas.toDataURL('image/png'), filename);
-  }
-  dataURLtoFile(dataurl, filename) {
-    const arr = dataurl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    var n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
-  }
-  buildView() {
-    let canvas_sprite = this.canvas_sprite;
-    let that = this;
-    that.imgs = [];
-    canvas_sprite.clear();
-    this.img_list.forEach(function(frame, i) {
-      new fabric.Image.fromURL(frame.url, function(img) {
-        let width = 300;
-        let scale = width / img.width;
-        let height = img.height * scale;
-        that.width = width;
-        that.height = height;
-        img.set({
-          selectable: false,
-          fill: 'rgba(0,0,0,0)',
-          width: img.width,
-          height: img.height,
-          scaleX: scale,
-          scaleY: scale,
-          originX: 'left',
-          originY: 'top',
-        });
-        img.left = img.width * scale * i;
-        canvas_sprite.setHeight(height);
-        canvas_sprite.setWidth(width * (i + 1));
-        canvas_sprite.add(img);
-        that.imgs.push(img);
-        //加线进来
-        let Line = new fabric.Line([width * i, 0, width * i, height], {
-          selectable: false,
-          fill: '#000000',
-          stroke: 'rgba(0,0,0,0.8)', //笔触颜色
-        });
-        canvas_sprite.add(Line);
-        canvas_sprite.renderAll();
-        that.framesLength = that.img_list.length; //图片总帧数
-        if (i === that.img_list.length - 1) that.handlerClipPartNum(); //加载为异步,必须在图片加载完成
-      });
-    });
   }
   //预览图片
   previewEffect(status) {
@@ -582,13 +637,14 @@ class App extends React.Component {
     let that = this;
     const props = {
       beforeUpload(file) {
-        that.pre_load_gif(file);
+        that.pre_load_gif_from_upload(file);
       },
     };
     const {
       optionArr,
       previewGifVisible,
       timeinterval,
+      gifUrl,
       spinVisible,
       previewGifImgUrl,
       isPreviewEffect,
@@ -605,6 +661,33 @@ class App extends React.Component {
               </Button>
             </Upload>
           </div>
+          <div className={styles['url-input']}>
+            <Input
+              addonBefore="图片url"
+              placeholder={gifUrl}
+              defaultValue={gifUrl}
+              onChange={event => {
+                this.setState(
+                  {
+                    gifUrl: event.target.value,
+                  },
+                  () => {
+                    this.pre_load_gif(this.state.gifUrl);
+                  },
+                );
+              }}
+            />
+          </div>
+          {/* <div className="btn">
+            <Button
+              type="primary"
+              onClick={() => {
+                this.initOptionArrData();
+              }}
+            >
+              添加图片
+            </Button>
+          </div> */}
           <div>
             <Radio.Group
               onChange={e => {
@@ -655,7 +738,7 @@ class App extends React.Component {
             />
           </div>
           <div className="btn">
-            <Button type="primary" onClick={this.previewEffect}>
+            <Button type="primary" onClick={this.previewEffect.bind(this, true)}>
               预览效果
             </Button>
           </div>
